@@ -1,5 +1,6 @@
 package board.article.api;
 
+import board.article.service.response.ArticlePageResponse;
 import board.article.service.response.ArticleResponse;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -52,6 +53,19 @@ public class ArticleApiTest {
                 .uri("/v1/articles/{articleId}", 212865095779332096L)
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    @Test
+    void readAll() {
+        ArticlePageResponse response = restClient.get()
+                .uri("/v1/articles?boardId=1&page=1&pageSize=30")
+                .retrieve()
+                .body(ArticlePageResponse.class);
+
+        System.out.println("response.getArticleCount() = " + response.getArticleCount());
+        for (ArticleResponse article : response.getArticles()) {
+            System.out.println("article.getArticleId() = " + article.getArticleId());
+        }
     }
 
     ArticleResponse read(Long articleId) {
