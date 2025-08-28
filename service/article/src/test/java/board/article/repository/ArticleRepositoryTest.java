@@ -1,6 +1,7 @@
 package board.article.repository;
 
 import board.article.entity.Article;
+import board.article.service.response.ArticleResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,4 +32,17 @@ class ArticleRepositoryTest {
         log.info("count: {}", count);
     }
 
+    @Test
+    void findInfiniteScrollTest() {
+        List<Article> articles = articleRepository.findAllInfiniteScroll(1L, 30L);
+        for (Article article : articles) {
+            log.info("article: {}", article.getArticleId());
+        }
+
+        Long lastArticleId = articles.getLast().getArticleId();
+        List<Article> articles2 = articleRepository.findAllInfiniteScroll(1L, 30L, lastArticleId);
+        for (Article article : articles2) {
+            log.info("article: {}", article.getArticleId());
+        }
+    }
 }
