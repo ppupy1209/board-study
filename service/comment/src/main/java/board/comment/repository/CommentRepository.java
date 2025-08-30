@@ -12,7 +12,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Query(
             value = "select count(*) from (" +
                     " select comment_id from comment " +
-                    " where aritlceId = :articleId and parent_comment_id = :parentCommentId " +
+                    " where article_id = :articleId and parent_comment_id = :parentCommentId " +
                     " limit :limit" +
                     ") t",
             nativeQuery = true
