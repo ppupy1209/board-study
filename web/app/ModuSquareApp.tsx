@@ -15,40 +15,41 @@ type Article = {
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:9000";
+const articleTags = ["일상", "취향", "질문", "동네", "여행"];
 
 const demoArticles: Article[] = [
   {
     articleId: 9014557001,
-    title: "좋은 시스템은 빠른 시스템보다 오래 설명할 수 있는 시스템이다",
-    content: "이번 주 팀 회고에서 장애 대응보다 더 오래 이야기한 건 선택의 이유였습니다. 기록이 남아 있으니 다음 결정은 훨씬 빨랐습니다.",
+    title: "비 오는 주말, 집에서 천천히 보기 좋은 영화가 있을까요?",
+    content: "따뜻한 차 한 잔과 함께 볼 영화를 찾고 있어요. 잔잔하게 오래 여운이 남는 작품이면 더 좋겠습니다.",
     writerId: 128,
     createdAt: "2026-07-17T08:42:00",
     articleCommentCount: 32,
     articleLikeCount: 148,
     articleViewCount: 1820,
-    tag: "개발",
+    tag: "질문",
   },
   {
     articleId: 9014557000,
     title: "여름밤, 서울에서 혼자 걷기 좋은 길을 모아봐요",
-    content: "한강처럼 넓은 길도 좋지만 조용한 골목과 작은 서점이 이어지는 코스를 더 좋아합니다. 여러분의 산책 루트는 어디인가요?",
+    content: "한강처럼 넓은 길도 좋지만 조용한 골목과 작은 서점이 이어지는 코스를 더 좋아합니다. 여러분의 산책길은 어디인가요?",
     writerId: 42,
     createdAt: "2026-07-17T08:18:00",
     articleCommentCount: 21,
     articleLikeCount: 96,
     articleViewCount: 934,
-    tag: "일상",
+    tag: "동네",
   },
   {
     articleId: 9014556999,
-    title: "커서 기반 페이지네이션을 적용하며 놓쳤던 한 가지",
-    content: "속도만 보고 바꿨다가 임의 페이지 이동이라는 제품 요구를 놓쳤습니다. 결국 목록마다 사용자의 탐색 방식을 먼저 정의했습니다.",
+    title: "아침을 잘 챙겨 먹게 된 나만의 작은 습관",
+    content: "전날 밤 식탁에 컵과 접시를 미리 꺼내두니 바쁜 아침에도 과일 하나는 챙기게 되더라고요. 여러분만의 방법도 궁금해요.",
     writerId: 77,
     createdAt: "2026-07-17T07:51:00",
     articleCommentCount: 18,
     articleLikeCount: 87,
     articleViewCount: 1104,
-    tag: "테크",
+    tag: "일상",
   },
   {
     articleId: 9014556998,
@@ -63,18 +64,18 @@ const demoArticles: Article[] = [
   },
   {
     articleId: 9014556997,
-    title: "Kafka 이벤트를 믿을 수 있게 만든 건 화려한 기능이 아니었다",
-    content: "Outbox에 남은 실패를 다시 읽고, 소비자는 같은 이벤트를 두 번 받아도 같은 결과를 만들도록 했습니다.",
+    title: "여행지에서 우연히 만난 작은 가게를 오래 기억하는 이유",
+    content: "유명한 명소보다 주인과 잠깐 이야기를 나눈 빵집이나 책방이 더 선명하게 남곤 해요. 여러분에게도 그런 장소가 있나요?",
     writerId: 16,
     createdAt: "2026-07-17T06:56:00",
     articleCommentCount: 29,
     articleLikeCount: 121,
     articleViewCount: 1542,
-    tag: "테크",
+    tag: "여행",
   },
 ];
 
-const categories = ["전체", "테크", "일상", "취향", "질문"];
+const categories = ["전체", ...articleTags];
 
 function formatCompact(value = 0) {
   return new Intl.NumberFormat("ko-KR", { notation: "compact", maximumFractionDigits: 1 }).format(value);
@@ -92,12 +93,24 @@ function publishedAt(date: string) {
   }).format(new Date(zonedDate));
 }
 
+function enrichArticles(items: Article[], offset = 0) {
+  return items.map((article, index) => ({
+    ...article,
+    tag: article.tag ?? articleTags[(index + offset) % articleTags.length],
+    articleCommentCount: article.articleCommentCount ?? 8 + index * 3,
+    articleLikeCount: article.articleLikeCount ?? 24 + index * 7,
+    articleViewCount: article.articleViewCount ?? 320 + index * 91,
+  }));
+}
+
 export function ModuSquareApp() {
   const [category, setCategory] = useState("전체");
   const [query, setQuery] = useState("");
   const [articles, setArticles] = useState(demoArticles);
-  const [dataMode, setDataMode] = useState<"demo" | "live">("demo");
   const [notice, setNotice] = useState("");
+  const [nextPage, setNextPage] = useState(2);
+  const [hasLiveArticles, setHasLiveArticles] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -110,14 +123,8 @@ export function ModuSquareApp() {
       })
       .then((data: { articles?: Article[] }) => {
         if (!data.articles?.length) return;
-        setArticles(data.articles.map((article, index) => ({
-          ...article,
-          tag: ["일상", "테크", "취향", "질문"][index % 4],
-          articleCommentCount: article.articleCommentCount ?? 8 + index * 3,
-          articleLikeCount: article.articleLikeCount ?? 24 + index * 7,
-          articleViewCount: article.articleViewCount ?? 320 + index * 91,
-        })));
-        setDataMode("live");
+        setArticles(enrichArticles(data.articles));
+        setHasLiveArticles(true);
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -134,49 +141,79 @@ export function ModuSquareApp() {
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
-    setNotice(query.trim() ? `“${query.trim()}” 검색 결과입니다.` : "최신 글을 보여드리고 있어요.");
+    if (query.trim()) setCategory("전체");
+    setNotice(query.trim() ? `“${query.trim()}” 검색 결과입니다.` : "새로운 이야기부터 보여드리고 있어요.");
+  }
+
+  async function loadMore() {
+    if (!hasLiveArticles) {
+      setNotice("지금은 여기까지예요. 잠시 후 새로운 이야기를 다시 확인해 주세요.");
+      return;
+    }
+
+    setIsLoadingMore(true);
+    try {
+      const response = await fetch(`${API_BASE}/v1/articles?boardId=1&page=${nextPage}&pageSize=12`);
+      if (!response.ok) throw new Error("api unavailable");
+      const data: { articles?: Article[] } = await response.json();
+      if (!data.articles?.length) {
+        setNotice("모든 이야기를 다 읽었어요. 새로운 글이 올라오면 다시 찾아와 주세요.");
+        return;
+      }
+      const nextArticles = enrichArticles(data.articles, articles.length);
+      setArticles((current) => {
+        const knownIds = new Set(current.map((article) => article.articleId));
+        return [...current, ...nextArticles.filter((article) => !knownIds.has(article.articleId))];
+      });
+      setNextPage((page) => page + 1);
+      setNotice(`${nextArticles.length}개의 이야기를 더 불러왔어요.`);
+    } catch {
+      setNotice("새로운 이야기를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setIsLoadingMore(false);
+    }
   }
 
   return (
     <div className="site-shell">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="모두의 광장 홈">
+        <a className="brand" href="#top" aria-label="Modu Square 홈">
           <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
-          <span>모두의 광장</span>
+          <span>Modu Square</span>
         </a>
         <nav className="main-nav" aria-label="주요 메뉴">
-          <a className="active" href="#feed">피드</a>
-          <a href="#popular">인기</a>
-          <a href="#system">시스템</a>
+          <a className="active" href="#feed">홈</a>
+          <a href="#popular">인기글</a>
+          <a href="#community">커뮤니티</a>
         </nav>
         <form className="search" onSubmit={submitSearch} role="search">
           <span aria-hidden="true">⌕</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이야기 검색" aria-label="게시글 검색" />
-          <kbd>↵</kbd>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="관심 있는 이야기 검색" aria-label="게시글 검색" />
+          <button className="search-submit" type="submit" aria-label="검색">↵</button>
         </form>
-        <button className="write-button" type="button" onClick={() => setNotice("데모에서는 글쓰기 흐름만 미리 보여드려요.")}>새 글 쓰기</button>
+        <button className="write-button" type="button" onClick={() => setNotice("새 글 쓰기는 로그인 후 이용할 수 있어요.")}>새 글 쓰기</button>
         <button className="profile-button" type="button" aria-label="내 프로필">YW</button>
       </header>
 
       <main id="top">
         <section className="signal-hero" aria-labelledby="hero-title">
           <div>
-            <p className="eyebrow"><span /> 일상부터 질문까지, 어떤 주제든 좋아요</p>
-            <h1 id="hero-title">주제에 경계 없이,<br /><em>생각이 만나는 광장.</em></h1>
-            <p className="hero-copy">가볍게 꺼낸 한마디가 새로운 대화의 시작이 됩니다.<br />자유게시판에서 관심사를 발견하고 경험을 나눠보세요.</p>
+            <p className="eyebrow"><span /> 누구나 편하게 머무는 열린 커뮤니티</p>
+            <h1 id="hero-title">오늘의 생각을 나누고,<br /><em>새로운 취향을 만나요.</em></h1>
+            <p className="hero-copy">소소한 일상부터 오래 품어온 질문까지.<br />가볍게 이야기를 시작하고 서로의 세계를 발견해보세요.</p>
           </div>
-          <div className="hero-metrics" aria-label="모두의 광장 주요 지표">
-            <div><strong>15M+</strong><span>자유게시판 글</span></div>
-            <div><strong>0.3s</strong><span>깊은 페이지 조회</span></div>
-            <div><strong>6</strong><span>독립 서비스</span></div>
+          <div className="hero-highlights" aria-label="Modu Square에서 나누는 이야기">
+            <div><strong>일상</strong><span>오늘 있었던 작은 순간</span></div>
+            <div><strong>취향</strong><span>좋아하는 것을 나누는 기쁨</span></div>
+            <div><strong>질문</strong><span>서로의 경험에서 찾는 답</span></div>
           </div>
         </section>
 
         <div className="content-grid">
           <section className="feed-column" id="feed" aria-labelledby="feed-title">
             <div className="section-heading">
-              <div><p className="section-kicker">FREE BOARD</p><h2 id="feed-title">자유게시판</h2></div>
-              <span className={`mode-badge ${dataMode}`}><i /> {dataMode === "live" ? "LIVE DATA" : "DEMO DATA"}</span>
+              <div><p className="section-kicker">LATEST STORIES</p><h2 id="feed-title">새로운 이야기</h2></div>
+              <span className="section-note">방금 올라온 글부터 만나보세요</span>
             </div>
             <div className="category-tabs" role="tablist" aria-label="게시글 카테고리">
               {categories.map((item) => (
@@ -187,11 +224,11 @@ export function ModuSquareApp() {
             <div className="article-list">
               {filtered.map((article, index) => (
                 <article className="article-card" key={`${article.articleId}-${index}`}>
-                  <div className="vote-rail" aria-label={`좋아요 ${article.articleLikeCount ?? 0}개`}>
-                    <span>⌃</span><strong>{formatCompact(article.articleLikeCount)}</strong>
+                  <div className="vote-rail" aria-label={`공감 ${article.articleLikeCount ?? 0}개`}>
+                    <span>♡</span><strong>{formatCompact(article.articleLikeCount)}</strong>
                   </div>
                   <div className="article-body">
-                    <div className="article-meta"><span className={`tag tag-${index % 4}`}>{article.tag ?? "이야기"}</span><span>modu_{article.writerId}</span><span>·</span><time>{publishedAt(article.createdAt)}</time></div>
+                    <div className="article-meta"><span className={`tag tag-${index % 5}`}>{article.tag ?? "이야기"}</span><span>modu_{article.writerId}</span><span>·</span><time>{publishedAt(article.createdAt)}</time></div>
                     <h3>{article.title}</h3>
                     <p>{article.content}</p>
                     <div className="article-stats"><span>◌ {formatCompact(article.articleCommentCount)} 대화</span><span>◎ {formatCompact(article.articleViewCount)} 읽음</span></div>
@@ -201,45 +238,43 @@ export function ModuSquareApp() {
               ))}
               {!filtered.length && <div className="empty-state"><strong>아직 이 주제의 이야기가 없어요.</strong><span>다른 키워드로 찾아보거나 첫 글을 시작해보세요.</span></div>}
             </div>
-            <button className="more-button" type="button" onClick={() => setNotice("다음 커서는 준비 중입니다. 현재 페이지는 30개 단위로 조회해요.")}>이야기 더 보기 <span>↓</span></button>
+            <button className="more-button" type="button" onClick={loadMore} disabled={isLoadingMore}>{isLoadingMore ? "불러오는 중…" : "이야기 더 보기"} <span>↓</span></button>
           </section>
 
           <aside className="side-column">
             <section className="side-card popular-card" id="popular">
-              <div className="side-title"><div><p>TRENDING NOW</p><h2>오늘의 인기 흐름</h2></div><span className="live-dot">LIVE</span></div>
+              <div className="side-title"><div><p>TRENDING NOW</p><h2>지금 인기 있는 이야기</h2></div><span className="live-dot">NOW</span></div>
               <ol>
                 {[
-                  ["01", "개발자의 기록은 어디까지 남겨야 할까", "테크 · 3.2K 읽음"],
-                  ["02", "이번 여름, 꼭 다시 가고 싶은 도시", "여행 · 2.8K 읽음"],
-                  ["03", "작은 팀에서 코드 리뷰를 지키는 법", "개발 · 2.1K 읽음"],
-                  ["04", "취향이 선명한 사람들의 책상", "라이프 · 1.7K 읽음"],
-                  ["05", "커피 한 잔으로 시작된 동네 모임", "일상 · 1.4K 읽음"],
+                  ["01", "올여름 가장 기억에 남은 한 장면", "일상 · 3.2K 읽음"],
+                  ["02", "다시 찾고 싶은 작은 도시를 소개해요", "여행 · 2.8K 읽음"],
+                  ["03", "요즘 나를 편안하게 만드는 저녁 습관", "취향 · 2.1K 읽음"],
+                  ["04", "우리 동네에 오래 남았으면 하는 가게", "동네 · 1.7K 읽음"],
+                  ["05", "마음에 오래 남은 책의 첫 문장", "취향 · 1.4K 읽음"],
                 ].map(([rank, title, meta]) => <li key={rank}><strong>{rank}</strong><div><span>{title}</span><small>{meta}</small></div></li>)}
               </ol>
             </section>
 
-            <section className="side-card system-card" id="system">
-              <div className="side-title"><div><p>SYSTEM PULSE</p><h2>서비스 상태</h2></div><span className="healthy">정상</span></div>
-              <div className="system-map">
-                <span>API</span><i /><span>Kafka</span><i /><span>Redis</span><i /><span>Read</span>
-              </div>
-              <dl>
-                <div><dt>이벤트 전달</dt><dd><span className="status-dot" /> 정상</dd></div>
-                <div><dt>조회 캐시</dt><dd>93.8% hit</dd></div>
-                <div><dt>자유게시판 글</dt><dd>15,000,100</dd></div>
-              </dl>
-              <a href="http://localhost:3001" target="_blank" rel="noreferrer">Grafana 대시보드 열기 <span>↗</span></a>
+            <section className="side-card community-card" id="community">
+              <div className="side-title"><div><p>WELCOME TO MODU SQUARE</p><h2>함께 만드는 광장</h2></div><span className="welcome-badge">환영해요</span></div>
+              <p className="community-copy">편안한 대화는 서로를 한 사람으로 존중하는 마음에서 시작됩니다.</p>
+              <ul>
+                <li><span>01</span><div><strong>다름을 존중해요</strong><small>생각보다 사람을 먼저 바라봐요.</small></div></li>
+                <li><span>02</span><div><strong>경험을 솔직하게 나눠요</strong><small>직접 겪은 일과 들은 이야기를 구분해요.</small></div></li>
+                <li><span>03</span><div><strong>함께 안전하게 지켜요</strong><small>불편한 글은 반응 대신 신고로 알려주세요.</small></div></li>
+              </ul>
+              <a href="#feed">첫 이야기 둘러보기 <span>→</span></a>
             </section>
 
             <section className="quote-card">
               <span className="quote-mark">“</span>
               <blockquote>좋은 커뮤니티는 답보다<br />더 나은 질문을 남깁니다.</blockquote>
-              <p>모두의 광장 community principle</p>
+              <p>Modu Square community principle</p>
             </section>
           </aside>
         </div>
       </main>
-      <footer><span>© 2026 모두의 광장</span><span>15M+ free-board event-driven community</span><nav><a href="#system">상태</a><a href="https://github.com/ppupy1209/modu-square">GitHub</a></nav></footer>
+      <footer><span>© 2026 Modu Square</span><span>오늘의 생각이 편안한 대화가 되는 곳</span><nav><a href="#popular">인기글</a><a href="#community">커뮤니티 약속</a></nav></footer>
     </div>
   );
 }

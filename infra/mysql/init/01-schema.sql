@@ -125,7 +125,7 @@ SELECT
   CONCAT(
     CASE MOD(n, 8)
       WHEN 0 THEN '오늘 하루, 다들 어떻게 보내셨나요? #'
-      WHEN 1 THEN '개발하면서 새로 배운 것을 나눠요 #'
+      WHEN 1 THEN '우리 동네 숨은 맛집을 소개해요 #'
       WHEN 2 THEN '주말에 가기 좋은 여행지를 추천해요 #'
       WHEN 3 THEN '요즘 빠져 있는 취미가 궁금해요 #'
       WHEN 4 THEN '커리어 고민을 함께 이야기해요 #'
@@ -135,7 +135,7 @@ SELECT
     END,
     n + 1
   ),
-  CONCAT('자유게시판에서 가볍게 생각과 경험을 나누는 데모 글입니다. topic=', MOD(n, 8) + 1, ', sequence=', n + 1),
+  CONCAT('일상과 취향, 질문을 자유롭게 나누는 이야기입니다. topic=', MOD(n, 8) + 1, ', sequence=', n + 1),
   1,
   MOD(n, 30) + 1,
   TIMESTAMPADD(MINUTE, -n, NOW()),

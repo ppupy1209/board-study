@@ -14,16 +14,16 @@ async function render() {
   );
 }
 
-test("server-renders the 모두의 광장 product page", async () => {
+test("server-renders the Modu Square community page", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>모두의 광장/);
-  assert.match(html, /주제에 경계 없이/);
-  assert.match(html, /15M\+/);
-  assert.match(html, /SYSTEM PULSE/);
+  assert.match(html, /<title>Modu Square/);
+  assert.match(html, /오늘의 생각을 나누고/);
+  assert.match(html, /함께 만드는 광장/);
+  assert.doesNotMatch(html, /깊은 페이지|독립 서비스|SYSTEM PULSE|Kafka|Redis|Grafana|15M\+/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
 
