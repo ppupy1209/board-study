@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function render(path = "/") {
   const workerUrl = new URL("../dist/server/ssr/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    new Request(`http://localhost${path}`, { headers: { accept: "text/html" } }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -27,19 +27,46 @@ test("server-renders the Modu Square community page", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
 
-test("keeps accessibility and social preview contracts", async () => {
-  const [page, layout, css, packageJson] = await Promise.all([
+test("server-renders writing and article detail routes", async () => {
+  const [writeResponse, detailResponse] = await Promise.all([
+    render("/write"),
+    render("/articles/8000000000000000099"),
+  ]);
+
+  assert.equal(writeResponse.status, 200);
+  assert.match(await writeResponse.text(), /<title>새 글 쓰기 — Modu Square<\/title>/);
+  assert.equal(detailResponse.status, 200);
+  assert.match(await detailResponse.text(), /<title>이야기 — Modu Square<\/title>/);
+});
+
+test("keeps accessibility, navigation, and social preview contracts", async () => {
+  const [page, chrome, detail, write, layout, css, packageJson, smallSeed, largeSeed] = await Promise.all([
     readFile(new URL("../app/ModuSquareApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/CommunityChrome.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/articles/[articleId]/ArticleDetailPage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/write/WriteArticlePage.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../../infra/mysql/init/01-schema.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../infra/mysql/seed/seed-articles.sh", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /aria-label="게시글 검색"/);
+  assert.match(chrome, /aria-label="게시글 검색"/);
+  assert.match(chrome, /href="\/write"/);
+  assert.match(page, /href=\{`\/articles\/\$\{article\.articleId\}`\}/);
+  assert.match(page, /popularArticles\.map/);
+  assert.match(page, /HOT_ARTICLE_API/);
+  assert.match(detail, /aria-pressed=\{liked\}/);
+  assert.match(detail, /이야기를 불러오고 있어요/);
+  assert.match(write, /<form className="editor-form"/);
+  assert.match(write, /어떤 이야기를 나누고 싶나요/);
   assert.match(page, /role="status"/);
   assert.match(layout, /\/og\.png/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /prefers-reduced-transparency:\s*reduce/);
   assert.match(css, /prefers-contrast:\s*more/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+  assert.doesNotMatch(smallSeed, /topic=|sequence=|THEN '[^']* #'/);
+  assert.doesNotMatch(largeSeed, /topic=|sequence=|THEN '[^']* #'/);
 });

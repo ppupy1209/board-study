@@ -1,28 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-
-type Article = {
-  articleId: number;
-  title: string;
-  content: string;
-  writerId: number;
-  createdAt: string;
-  articleCommentCount?: number;
-  articleLikeCount?: number;
-  articleViewCount?: number;
-  tag?: string;
-};
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:9000";
+import { CommunityFooter, CommunityHeader } from "./CommunityChrome";
+import {
+  ARTICLE_API,
+  HOT_ARTICLE_API,
+  Article,
+  HotArticle,
+  normalizeArticle,
+  normalizeArticleTitle,
+  publishedAt,
+} from "../lib/community-api";
 const articleTags = ["일상", "취향", "질문", "동네", "여행"];
 
 const demoArticles: Article[] = [
   {
-    articleId: 9014557001,
+    articleId: "9014557001",
     title: "비 오는 주말, 집에서 천천히 보기 좋은 영화가 있을까요?",
     content: "따뜻한 차 한 잔과 함께 볼 영화를 찾고 있어요. 잔잔하게 오래 여운이 남는 작품이면 더 좋겠습니다.",
-    writerId: 128,
+    writerId: "128",
     createdAt: "2026-07-17T08:42:00",
     articleCommentCount: 32,
     articleLikeCount: 148,
@@ -30,10 +27,10 @@ const demoArticles: Article[] = [
     tag: "질문",
   },
   {
-    articleId: 9014557000,
+    articleId: "9014557000",
     title: "여름밤, 서울에서 혼자 걷기 좋은 길을 모아봐요",
     content: "한강처럼 넓은 길도 좋지만 조용한 골목과 작은 서점이 이어지는 코스를 더 좋아합니다. 여러분의 산책길은 어디인가요?",
-    writerId: 42,
+    writerId: "42",
     createdAt: "2026-07-17T08:18:00",
     articleCommentCount: 21,
     articleLikeCount: 96,
@@ -41,10 +38,10 @@ const demoArticles: Article[] = [
     tag: "동네",
   },
   {
-    articleId: 9014556999,
+    articleId: "9014556999",
     title: "아침을 잘 챙겨 먹게 된 나만의 작은 습관",
     content: "전날 밤 식탁에 컵과 접시를 미리 꺼내두니 바쁜 아침에도 과일 하나는 챙기게 되더라고요. 여러분만의 방법도 궁금해요.",
-    writerId: 77,
+    writerId: "77",
     createdAt: "2026-07-17T07:51:00",
     articleCommentCount: 18,
     articleLikeCount: 87,
@@ -52,10 +49,10 @@ const demoArticles: Article[] = [
     tag: "일상",
   },
   {
-    articleId: 9014556998,
+    articleId: "9014556998",
     title: "요즘 반복해서 듣는 앨범 한 장씩 추천해주세요",
     content: "처음부터 끝까지 순서대로 들을 때 더 좋은 앨범을 찾고 있어요. 장르는 가리지 않습니다.",
-    writerId: 304,
+    writerId: "304",
     createdAt: "2026-07-17T07:23:00",
     articleCommentCount: 44,
     articleLikeCount: 73,
@@ -63,10 +60,10 @@ const demoArticles: Article[] = [
     tag: "취향",
   },
   {
-    articleId: 9014556997,
+    articleId: "9014556997",
     title: "여행지에서 우연히 만난 작은 가게를 오래 기억하는 이유",
     content: "유명한 명소보다 주인과 잠깐 이야기를 나눈 빵집이나 책방이 더 선명하게 남곤 해요. 여러분에게도 그런 장소가 있나요?",
-    writerId: 16,
+    writerId: "16",
     createdAt: "2026-07-17T06:56:00",
     articleCommentCount: 29,
     articleLikeCount: 121,
@@ -81,26 +78,21 @@ function formatCompact(value = 0) {
   return new Intl.NumberFormat("ko-KR", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
-function publishedAt(date: string) {
-  const zonedDate = /(?:Z|[+-]\d{2}:\d{2})$/.test(date) ? date : `${date}+09:00`;
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Seoul",
-  }).format(new Date(zonedDate));
-}
-
 function enrichArticles(items: Article[], offset = 0) {
-  return items.map((article, index) => ({
-    ...article,
-    tag: article.tag ?? articleTags[(index + offset) % articleTags.length],
-    articleCommentCount: article.articleCommentCount ?? 8 + index * 3,
-    articleLikeCount: article.articleLikeCount ?? 24 + index * 7,
-    articleViewCount: article.articleViewCount ?? 320 + index * 91,
-  }));
+  return items.map((article, index) => {
+    const normalized = normalizeArticle({
+      ...article,
+      articleId: String(article.articleId),
+      writerId: String(article.writerId),
+    });
+    return {
+      ...normalized,
+      tag: normalized.tag ?? articleTags[(index + offset) % articleTags.length],
+      articleCommentCount: normalized.articleCommentCount ?? 8 + index * 3,
+      articleLikeCount: normalized.articleLikeCount ?? 24 + index * 7,
+      articleViewCount: normalized.articleViewCount ?? 320 + index * 91,
+    };
+  });
 }
 
 export function ModuSquareApp() {
@@ -111,10 +103,22 @@ export function ModuSquareApp() {
   const [nextPage, setNextPage] = useState(2);
   const [hasLiveArticles, setHasLiveArticles] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [hotArticles, setHotArticles] = useState<HotArticle[]>([]);
 
   useEffect(() => {
+    const restoreBrowserState = window.setTimeout(() => {
+      const requestedQuery = new URLSearchParams(window.location.search).get("q");
+      if (requestedQuery) setQuery(requestedQuery);
+      try {
+        setSavedIds(new Set(JSON.parse(localStorage.getItem("modu-square-saved") ?? "[]") as string[]));
+      } catch {
+        localStorage.removeItem("modu-square-saved");
+      }
+    }, 0);
+
     const controller = new AbortController();
-    fetch(`${API_BASE}/v1/articles?boardId=1&page=1&pageSize=12`, {
+    fetch(`${ARTICLE_API}/v1/articles?boardId=1&page=1&pageSize=12`, {
       signal: controller.signal,
     })
       .then((response) => {
@@ -127,17 +131,47 @@ export function ModuSquareApp() {
         setHasLiveArticles(true);
       })
       .catch(() => undefined);
-    return () => controller.abort();
+
+    const today = new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "Asia/Seoul",
+    }).format(new Date()).replaceAll("-", "");
+    fetch(`${HOT_ARTICLE_API}/v1/hot-articles/articles/date/${today}`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("hot article api unavailable");
+        return response.json();
+      })
+      .then((items: HotArticle[]) => setHotArticles(items.slice(0, 5).map((item) => ({
+        ...item,
+        articleId: String(item.articleId),
+        title: normalizeArticleTitle(String(item.articleId), item.title),
+      }))))
+      .catch(() => undefined);
+    return () => {
+      window.clearTimeout(restoreBrowserState);
+      controller.abort();
+    };
   }, []);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return articles.filter((article) => {
       const inCategory = category === "전체" || article.tag === category;
-      const inQuery = !normalized || `${article.title} ${article.content}`.toLowerCase().includes(normalized);
+      const inQuery = !normalized || `${article.title} ${article.content} modu_${article.writerId}`.toLowerCase().includes(normalized);
       return inCategory && inQuery;
     });
   }, [articles, category, query]);
+
+  const popularArticles = useMemo<HotArticle[]>(() => {
+    if (hotArticles.length) return hotArticles;
+    return articles.slice(0, 5).map((article) => ({
+      articleId: article.articleId,
+      title: article.title,
+      createdAt: article.createdAt,
+    }));
+  }, [articles, hotArticles]);
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
@@ -153,7 +187,7 @@ export function ModuSquareApp() {
 
     setIsLoadingMore(true);
     try {
-      const response = await fetch(`${API_BASE}/v1/articles?boardId=1&page=${nextPage}&pageSize=12`);
+      const response = await fetch(`${ARTICLE_API}/v1/articles?boardId=1&page=${nextPage}&pageSize=12`);
       if (!response.ok) throw new Error("api unavailable");
       const data: { articles?: Article[] } = await response.json();
       if (!data.articles?.length) {
@@ -174,26 +208,24 @@ export function ModuSquareApp() {
     }
   }
 
+  function toggleSaved(articleId: string) {
+    setSavedIds((current) => {
+      const next = new Set(current);
+      if (next.has(articleId)) {
+        next.delete(articleId);
+        setNotice("저장한 글에서 제외했어요.");
+      } else {
+        next.add(articleId);
+        setNotice("나중에 읽을 글에 저장했어요.");
+      }
+      localStorage.setItem("modu-square-saved", JSON.stringify([...next]));
+      return next;
+    });
+  }
+
   return (
     <div className="site-shell">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Modu Square 홈">
-          <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
-          <span>Modu Square</span>
-        </a>
-        <nav className="main-nav" aria-label="주요 메뉴">
-          <a className="active" href="#feed">홈</a>
-          <a href="#popular">인기글</a>
-          <a href="#community">커뮤니티</a>
-        </nav>
-        <form className="search" onSubmit={submitSearch} role="search">
-          <span aria-hidden="true">⌕</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="관심 있는 이야기 검색" aria-label="게시글 검색" />
-          <button className="search-submit" type="submit" aria-label="검색">↵</button>
-        </form>
-        <button className="write-button" type="button" onClick={() => setNotice("새 글 쓰기는 로그인 후 이용할 수 있어요.")}>새 글 쓰기</button>
-        <button className="profile-button" type="button" aria-label="내 프로필">YW</button>
-      </header>
+      <CommunityHeader query={query} onQueryChange={setQuery} onSearchSubmit={submitSearch} active="home" />
 
       <main id="top">
         <section className="signal-hero" aria-labelledby="hero-title">
@@ -227,13 +259,19 @@ export function ModuSquareApp() {
                   <div className="vote-rail" aria-label={`공감 ${article.articleLikeCount ?? 0}개`}>
                     <span>♡</span><strong>{formatCompact(article.articleLikeCount)}</strong>
                   </div>
-                  <div className="article-body">
+                  <Link className="article-body article-link" href={`/articles/${article.articleId}`}>
                     <div className="article-meta"><span className={`tag tag-${index % 5}`}>{article.tag ?? "이야기"}</span><span>modu_{article.writerId}</span><span>·</span><time>{publishedAt(article.createdAt)}</time></div>
                     <h3>{article.title}</h3>
                     <p>{article.content}</p>
                     <div className="article-stats"><span>◌ {formatCompact(article.articleCommentCount)} 대화</span><span>◎ {formatCompact(article.articleViewCount)} 읽음</span></div>
-                  </div>
-                  <button type="button" className="save-button" aria-label={`${article.title} 저장`} onClick={() => setNotice("나중에 읽을 글에 저장했어요.")}>＋</button>
+                  </Link>
+                  <button
+                    type="button"
+                    className={`save-button ${savedIds.has(article.articleId) ? "saved" : ""}`}
+                    aria-label={`${article.title} ${savedIds.has(article.articleId) ? "저장 해제" : "저장"}`}
+                    aria-pressed={savedIds.has(article.articleId)}
+                    onClick={() => toggleSaved(article.articleId)}
+                  >{savedIds.has(article.articleId) ? "✓" : "＋"}</button>
                 </article>
               ))}
               {!filtered.length && <div className="empty-state"><strong>아직 이 주제의 이야기가 없어요.</strong><span>다른 키워드로 찾아보거나 첫 글을 시작해보세요.</span></div>}
@@ -245,13 +283,15 @@ export function ModuSquareApp() {
             <section className="side-card popular-card" id="popular">
               <div className="side-title"><div><p>TRENDING NOW</p><h2>지금 인기 있는 이야기</h2></div><span className="live-dot">NOW</span></div>
               <ol>
-                {[
-                  ["01", "올여름 가장 기억에 남은 한 장면", "일상 · 3.2K 읽음"],
-                  ["02", "다시 찾고 싶은 작은 도시를 소개해요", "여행 · 2.8K 읽음"],
-                  ["03", "요즘 나를 편안하게 만드는 저녁 습관", "취향 · 2.1K 읽음"],
-                  ["04", "우리 동네에 오래 남았으면 하는 가게", "동네 · 1.7K 읽음"],
-                  ["05", "마음에 오래 남은 책의 첫 문장", "취향 · 1.4K 읽음"],
-                ].map(([rank, title, meta]) => <li key={rank}><strong>{rank}</strong><div><span>{title}</span><small>{meta}</small></div></li>)}
+                {popularArticles.map((article, index) => (
+                  <li key={article.articleId}>
+                    <strong>{String(index + 1).padStart(2, "0")}</strong>
+                    <Link href={`/articles/${article.articleId}`}>
+                      <span>{article.title}</span>
+                      <small>{hotArticles.length ? "지금 대화가 활발한 이야기" : "새롭게 주목받는 이야기"} <b>→</b></small>
+                    </Link>
+                  </li>
+                ))}
               </ol>
             </section>
 
@@ -274,7 +314,7 @@ export function ModuSquareApp() {
           </aside>
         </div>
       </main>
-      <footer><span>© 2026 Modu Square</span><span>오늘의 생각이 편안한 대화가 되는 곳</span><nav><a href="#popular">인기글</a><a href="#community">커뮤니티 약속</a></nav></footer>
+      <CommunityFooter />
     </div>
   );
 }

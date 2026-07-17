@@ -2,6 +2,8 @@ package board.comment.service.response;
 
 import board.comment.entity.Comment;
 import board.comment.entity.CommentV2;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -10,10 +12,14 @@ import java.time.LocalDateTime;
 @Getter
 @ToString
 public class CommentResponse {
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long commentId;
     private String content;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long parentCommentId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long articleId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long writerId;
     private Boolean deleted;
     private String path;

@@ -5,6 +5,7 @@ x-service-environment: &service-environment
   REDIS_PORT: 6379
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   JPA_SHOW_SQL: "false"
+  CORS_ALLOWED_ORIGINS: http://localhost:3000
 
 x-service-dependencies: &service-dependencies
   mysql:
@@ -100,7 +101,6 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/article
       DB_USERNAME: root
       DB_PASSWORD: root
-      CORS_ALLOWED_ORIGINS: http://localhost:3000
     ports: ["9000:9000"]
     depends_on: *service-dependencies
     restart: unless-stopped
@@ -188,9 +188,21 @@ services:
     build: ./web
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:9000
+      NEXT_PUBLIC_COMMENT_API_BASE_URL: http://localhost:9001
+      NEXT_PUBLIC_LIKE_API_BASE_URL: http://localhost:9002
+      NEXT_PUBLIC_VIEW_API_BASE_URL: http://localhost:9003
+      NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL: http://localhost:9004
     ports: ["3000:3000"]
     depends_on:
       article:
+        condition: service_started
+      comment:
+        condition: service_started
+      like:
+        condition: service_started
+      view:
+        condition: service_started
+      hot-article:
         condition: service_started
     restart: unless-stopped
 
