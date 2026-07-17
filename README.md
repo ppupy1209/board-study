@@ -24,24 +24,80 @@ docker compose up --build
 # 최초 1회: 자유게시판을 총 15,000,100건 규모로 확장
 docker compose --profile large-data run --rm seed-large
 
-# 1,500만 건 적재 완료 후 부하 테스트
-docker compose --profile loadtest run --rm k6
+# 1,500만 건 적재 완료 후 부하 테스트 (배선 확인용 smoke)
+docker compose run --rm k6 run /scripts/smoke.js
 ```
 
+### 부하 테스트 스위트
+
+k6 결과를 Prometheus에 적재해 애플리케이션 지표와 같은 시간축에서 보려면 `-o experimental-prometheus-rw`를 붙입니다.
+
+```bash
+# 배선 확인 (1분). 실패하면 더 큰 부하를 실행하지 않습니다.
+TEST_ID=smoke-1 docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/smoke.js
+
+# 평상시 기준선
+TEST_ID=avg-1 RATE=100 DURATION=10m docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/average-load.js
+
+# 안정 처리량과 breakpoint 탐색
+TEST_ID=bp-1 STAGES=50,100,200,400,600,800,1000 STAGE_DURATION=3m \
+  docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/breakpoint.js
+
+# 1,500만 건 깊은 페이지 (page 1 / 100k / 300k / 500k / keyset)
+TEST_ID=deep-1 docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/deep-pagination.js
+
+# 실제 사용자 혼합 트래픽 (조회 + 쓰기)
+TEST_ID=mixed-1 RATE=100 DURATION=5m docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/mixed-workload.js
+
+# 급증 / 장시간 (STABLE_RATE는 breakpoint 실측값을 넣습니다)
+TEST_ID=spike-1 STABLE_RATE=1000 docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/spike.js
+TEST_ID=soak-1 STABLE_RATE=1000 DURATION=60m docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/soak.js
+
+# Kafka 장애 -> Outbox 보존 -> 복구 -> 정합성 확인 (Kafka 중단/복구까지 자동)
+bash load-tests/kafka-recovery.sh
+```
+
+Grafana의 **모두의 광장 성능·병목 분석** 대시보드에서 `testid`로 실행을 골라 결과를 확인합니다.
+
+> k6 0.57.0에서 Prometheus remote write output(`experimental-prometheus-rw`)은 아직 **experimental**입니다.
+> 출력 이름과 동작이 버전에 따라 바뀔 수 있어 이미지 버전을 `grafana/k6:0.57.0`으로 고정했습니다.
+> 또한 k6 텍스트 요약은 **ms**, remote write로 적재되는 `k6_http_req_duration_*`는 **초** 단위입니다.
+
 대용량 데이터는 Compose의 `mysql-data` named volume에 저장됩니다. `docker compose stop`, `restart`, `down`과 컴퓨터 재부팅 후에도 유지되며, 이후 `docker compose up`은 데이터를 다시 넣지 않습니다. **`docker compose down -v`는 볼륨과 1,500만 건을 삭제하므로 사용하지 마세요.** 중간에 적재를 멈춰도 같은 명령을 다시 실행하면 마지막 10만 건 배치부터 이어집니다.
+
+> **주의**: `src/test` 아래의 `DataInitializer` 계열은 성능 실험용 데이터를 만드는 **수동 도구**입니다.
+> `@Test`가 붙어 있어 `./gradlew test`에 딸려 실행되면 자유게시판에 1,200만 건을 추가해 데이터셋을 오염시킵니다.
+> 현재는 `@Disabled`로 막아 두었습니다.
 
 ## 검증 포인트
 
 | 주제 | 구현 | 확인 위치 |
 |---|---|---|
-| 대용량 목록 조회 | Covering Index + ID 선조회 JOIN, 무한 스크롤 Keyset | `ArticleRepository`, [개발 기록](docs/development-log.md#2-1500만-건-자유게시판-목록-조회-최적화) |
-| 이벤트 전달 신뢰성 | Transactional Outbox + 즉시 발행 + 미발행 재처리 | `common:outbox-message-relay` |
-| 조회 모델 분리 | CQRS 읽기 모델 + Redis Sorted Set + Request Collapsing | `service:article-read` |
+| 대용량 목록 조회 | Covering Index + ID 선조회 JOIN, 무한 스크롤 Keyset | `ArticleRepository`, `load-tests/k6/deep-pagination.js` |
+| 이벤트 전달 신뢰성 | Transactional Outbox, **전송 확인 후에만 삭제** + 미발행 재처리 | `common:outbox-message-relay`, `MessageRelayTest` |
+| 이벤트 멱등성 | 절대값 반영으로 중복 소비에도 결과 동일 | `QueryModelIdempotencyTest` |
+| 조회 모델 분리 | CQRS 읽기 모델 + Redis Sorted Set + Request Collapsing | `service:article-read`, `OptimizedCacheManagerTest` |
 | 실시간 인기글 | Kafka 이벤트 + Redis ZSet | `service:hot-article` |
-| 관측성 | Spring Actuator + Prometheus + Grafana | `infra/` |
-| 부하 검증 | 일반 목록과 깊은 페이지를 분리한 k6 시나리오 | `load-tests/k6/` |
+| 관측성 | Actuator + Prometheus + Grafana + MySQL/Redis/Kafka exporter + k6 remote write | `infra/`, `docker-compose.yml` |
+| 부하 검증 | smoke/average/breakpoint/deep-page/mixed/spike/soak/kafka-recovery 분리 | `load-tests/k6/` |
+| 동시성 정확성 | count 행 원자적 upsert로 deadlock 제거 | `BoardArticleCountRepository`, `ArticleCommentCountRepository`, `ArticleLikeCountRepository` |
 
 개발 과정의 선택 이유와 한계는 [개발 기록](docs/development-log.md), 대용량 실험 재현 절차는 [성능 테스트 가이드](docs/performance-test.md)에 정리했습니다.
+
+### 실측 요약 (자유게시판 15,000,100건, 로컬 단일 머신)
+
+| 항목 | 실측 |
+|---|---|
+| 일반 목록 조회 안정 처리량 | **1,000 RPS 이상**에서 p95 3ms, 오류 0% (이 범위에서 한계 미발견) |
+| 깊은 페이지 (page 500,000) 단일 요청 | **9.42초** (OFFSET 14,999,970) |
+| 같은 위치 Keyset 조회 | **0.0055초** (약 1,700배 차이) |
+| 가장 먼저 포화된 자원 | article-service **HikariCP 커넥션 풀**(max 10, pending peak 31) |
+| **article-read 상세 조회 팬아웃** | 요청 45만 건 → **내부 호출 178만 건 (1:4)**, Query Model 적중률 ≈ 0% |
+| Kafka 60초 장애 | 이벤트 유실 **0건**, backlog 정상화 **25초**, 최종 정합성 일치 |
+| spike (300 → 1,100 RPS) | p99 변화 **없음**, 오류 0% |
+| soak (50 iter/s, 20분) | 누수·열화 징후 **없음** (heap -15.8%, GC pause -61%) |
+
+> 로컬 단일 머신에서 k6 부하 생성기와 모든 서비스가 CPU를 공유한 결과이며, 운영 환경 최대 처리량이 아닙니다.
 
 ---
 
@@ -155,13 +211,10 @@ public ArticleResponse create(ArticleCreateRequest request) {
             )
     );
 
-    int result = boardArticleCountRepository.increase(request.getBoardId());
-
-    if (result == 0) {
-        boardArticleCountRepository.save(
-                BoardArticleCount.init(request.getBoardId(), 1L)
-        );
-    }
+    // 행이 없으면 만들고 있으면 증가시키는 것을 한 문장으로 처리한다.
+    // "UPDATE 해보고 0건이면 INSERT" 방식은 아직 count 행이 없는 board에 동시 요청이 몰릴 때
+    // gap lock 경합으로 deadlock이 발생한다.
+    boardArticleCountRepository.increaseOrCreate(request.getBoardId());
 
     outboxEventPublisher.publish(
             EventType.ARTICLE_CREATED,
@@ -299,12 +352,17 @@ Outbox Save
 Transaction Commit
   ↓
 Kafka Publish
-  ↓
-Outbox Delete
+  ├─ 전송 확인 성공 → Outbox Delete
+  └─ 실패/타임아웃   → Outbox 유지 → 스케줄러가 재발행
 ```
 
-Kafka 발행에 실패한 이벤트는 일정 시간이 지난 뒤 다시 조회해 발행  
-여러 인스턴스가 동시에 같은 이벤트를 처리하지 않도록 shard 단위로 담당 이벤트 분리
+**Outbox는 Kafka 전송이 확인된 경우에만 삭제한다.** 전송 결과와 무관하게 삭제하면 Kafka 장애 구간의
+이벤트가 그대로 유실된다. 이 동작은 성공/예외/타임아웃/재시도 성공 네 경로를 `MessageRelayTest`로 고정해 두었다.
+
+재시도 때문에 같은 이벤트가 중복 전송될 수 있다(at-least-once). Query Model 핸들러는 payload가 실어 보낸
+**절대값**을 반영하고 증분 연산을 하지 않으므로 중복 소비에도 결과가 같다(`QueryModelIdempotencyTest`).
+
+여러 인스턴스가 동시에 같은 이벤트를 처리하지 않도록 shard 단위로 담당 이벤트를 나눈다.
 
 ```java
 @Scheduled(

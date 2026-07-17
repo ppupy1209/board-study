@@ -1,6 +1,11 @@
 server:
   port: 9001
   shutdown: graceful
+  tomcat:
+    # Tomcat thread pool 포화 지표(tomcat_threads_busy_threads / tomcat_threads_config_max_threads)는
+    # MBean registry가 켜져 있어야 actuator prometheus endpoint에 노출된다.
+    mbeanregistry:
+      enabled: true
 spring:
   application:
     name: modu-square-comment-service

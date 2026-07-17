@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface OutboxRepository extends JpaRepository<Outbox, Long> {
@@ -15,4 +16,6 @@ public interface OutboxRepository extends JpaRepository<Outbox, Long> {
             LocalDateTime from,
             Pageable pageable
     );
+
+    Optional<Outbox> findFirstByOrderByCreatedAtAsc();
 }

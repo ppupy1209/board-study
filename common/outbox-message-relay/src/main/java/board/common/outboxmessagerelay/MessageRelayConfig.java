@@ -49,4 +49,14 @@ public class MessageRelayConfig {
     public Executor messageRelayPublishPendingExecutor() {
         return Executors.newSingleThreadScheduledExecutor();
     }
+
+    /**
+     * backlog 지표 수집 전용 스케줄러.
+     * 재시도 발행(messageRelayPublishPendingExecutor)이나 shard ping과 스레드를 공유하지 않게 해서,
+     * 지표 조회가 느려져도 이벤트 발행 경로에 영향을 주지 않는다.
+     */
+    @Bean
+    public Executor messageRelayBacklogMonitorExecutor() {
+        return Executors.newSingleThreadScheduledExecutor();
+    }
 }

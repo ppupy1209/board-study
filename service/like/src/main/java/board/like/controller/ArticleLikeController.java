@@ -5,6 +5,9 @@ import board.like.service.response.ArticleLikeResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequiredArgsConstructor
 public class ArticleLikeController {
@@ -64,6 +67,12 @@ public class ArticleLikeController {
             @PathVariable Long userId
     ) {
         articleLikeService.unlikeOptimisticLock(articleId, userId);
+    }
+
+    /** 여러 게시글의 좋아요 수를 한 번에 반환한다. article-read 목록 팬아웃 제거용. */
+    @GetMapping("/v1/article-likes/articles/counts")
+    public Map<Long, Long> countAll(@RequestParam("articleIds") List<Long> articleIds) {
+        return articleLikeService.countAll(articleIds);
     }
 
     @GetMapping("/v1/article-likes/articles/{articleId}/count")

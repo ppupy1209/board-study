@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+# k6 부하 테스트 실행 결과 (실행할 때마다 생성되는 산출물)
+# 문서화된 수치는 docs/performance-results/ 에 정리한다.
+load-tests/results/

@@ -17,6 +17,8 @@ x-service-dependencies: &service-dependencies
 services:
   mysql:
     image: mysql:8.4
+    # buffer pool 1G + 커넥션/정렬 버퍼 + 오버헤드. 다른 컨테이너에 밀려 OOM되지 않도록 확보한다.
+    mem_limit: 2g
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
@@ -90,6 +92,9 @@ services:
     build:
       context: .
       args: { SERVICE: article }
+    # 컨테이너 한도가 없으면 MaxRAMPercentage=75가 VM 전체 기준으로 계산되어
+    # JVM 6개가 메모리를 나눠 갖지 못하고 MySQL을 밀어낸다. 한도를 명시한다.
+    mem_limit: 576m
     environment:
       <<: *service-environment
       DB_URL: jdbc:mysql://mysql:3306/article
@@ -104,6 +109,9 @@ services:
     build:
       context: .
       args: { SERVICE: comment }
+    # 컨테이너 한도가 없으면 MaxRAMPercentage=75가 VM 전체 기준으로 계산되어
+    # JVM 6개가 메모리를 나눠 갖지 못하고 MySQL을 밀어낸다. 한도를 명시한다.
+    mem_limit: 576m
     environment:
       <<: *service-environment
       DB_URL: jdbc:mysql://mysql:3306/comment
@@ -117,6 +125,9 @@ services:
     build:
       context: .
       args: { SERVICE: like }
+    # 컨테이너 한도가 없으면 MaxRAMPercentage=75가 VM 전체 기준으로 계산되어
+    # JVM 6개가 메모리를 나눠 갖지 못하고 MySQL을 밀어낸다. 한도를 명시한다.
+    mem_limit: 576m
     environment:
       <<: *service-environment
       DB_URL: jdbc:mysql://mysql:3306/article_like
@@ -130,6 +141,9 @@ services:
     build:
       context: .
       args: { SERVICE: view }
+    # 컨테이너 한도가 없으면 MaxRAMPercentage=75가 VM 전체 기준으로 계산되어
+    # JVM 6개가 메모리를 나눠 갖지 못하고 MySQL을 밀어낸다. 한도를 명시한다.
+    mem_limit: 576m
     environment:
       <<: *service-environment
       DB_URL: jdbc:mysql://mysql:3306/article_view
@@ -143,6 +157,8 @@ services:
     build:
       context: .
       args: { SERVICE: hot-article }
+    # 이벤트 소비와 ZSet 갱신만 하므로 가장 가볍다(실측 371MiB). article-read에 여유를 주기 위해 줄인다.
+    mem_limit: 448m
     environment:
       <<: *service-environment
       ARTICLE_SERVICE_URL: http://article:9000
@@ -154,6 +170,10 @@ services:
     build:
       context: .
       args: { SERVICE: article-read }
+    # 이 서비스는 조회 모델 miss를 메우려고 원본 3~4곳을 호출해 합치는 집계자라,
+    # 다른 서비스보다 in-flight 응답을 많이 들고 있다. 576m에서는 부하 중 OOM으로 26회 재시작했다.
+    # (한도가 없던 시절 실측 사용량은 973MiB였다.)
+    mem_limit: 896m
     environment:
       <<: *service-environment
       ARTICLE_SERVICE_URL: http://article:9000
@@ -176,7 +196,11 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.2.1
-    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    # remote write receiver는 k6가 부하 테스트 결과를 애플리케이션 지표와 같은 시간축에 적재하기 위해 필요하다.
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-remote-write-receiver
     ports: ["9090:9090"]
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -197,6 +221,43 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    command: ["--redis.addr=redis://redis:6379"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 단일 broker 로컬 구성이므로 partition 복제/장애 조치 지표는 측정 대상이 아니다.
+  # consumer group lag과 topic 처리량 확인이 목적이다.
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.8.0
+    command: ["--kafka.server=kafka:9092", "--kafka.version=3.8.0"]
+    depends_on:
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+
+  # 대시보드를 PNG로 렌더링해 문서에 넣기 위한 렌더러.
+  # Grafana가 이 컨테이너를 호출해 headless Chrome으로 화면을 그린다.
+  grafana-image-renderer:
+    image: grafana/grafana-image-renderer:3.11.6
+    # 대시보드 PNG를 만들 때만 필요하다. 기본 실행에서 메모리를 차지하지 않도록 profile로 분리한다.
+    #   docker compose --profile capture up -d grafana-image-renderer
+    profiles: ["capture"]
+    mem_limit: 512m
+    environment:
+      ENABLE_METRICS: "false"
+      # 6개 row를 한 장에 담으려면 기본 상한(3000)으로는 아래쪽 row가 잘린다.
+      RENDERING_VIEWPORT_MAX_HEIGHT: "5000"
+      RENDERING_VIEWPORT_MAX_WIDTH: "2400"
+      RENDERING_VIEWPORT_MAX_DEVICE_SCALE_FACTOR: "2"
+      # 큰 대시보드는 렌더에 시간이 걸린다.
+      RENDERING_TIMING_METRICS: "false"
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:11.5.2
@@ -204,22 +265,72 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # /render API로 대시보드 PNG를 만들 때 사용한다.
+      # CALLBACK_URL은 렌더러가 다시 Grafana를 호출할 때 쓰므로 컨테이너 네트워크 주소여야 한다.
+      GF_RENDERING_SERVER_URL: http://grafana-image-renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
+      GF_LOG_FILTERS: rendering:debug
     ports: ["3001:3000"]
     volumes:
       - grafana-data:/var/lib/grafana
+      # 대시보드는 grafana-data volume(/var/lib/grafana) 바깥에 mount한다.
+      # volume 아래에 중첩해서 mount하면 volume이 그 경로를 가려 provisioning이 조용히 실패한다.
       - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./infra/grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
       - prometheus
 
+  # k6 0.57.0에서 prometheus remote write output 이름은 experimental-prometheus-rw이며 아직 experimental이다.
+  # 출력 이름과 동작이 버전에 따라 바뀔 수 있으므로 이미지 버전을 고정한다.
   k6:
     image: grafana/k6:0.57.0
     profiles: ["loadtest"]
     volumes:
       - ./load-tests/k6:/scripts:ro
-    command: run /scripts/article-list.js
+      - ./load-tests/results:/results
+    command: run /scripts/smoke.js
     environment:
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_TREND_STATS: "p(95),p(99),min,max"
+      K6_PROMETHEUS_RW_PUSH_INTERVAL: 5s
       BASE_URL: http://article:9000
+      ARTICLE_URL: http://article:9000
+      COMMENT_URL: http://comment:9001
+      LIKE_URL: http://like:9002
+      VIEW_URL: http://view:9003
+      HOT_ARTICLE_URL: http://hot-article:9004
+      ARTICLE_READ_URL: http://article-read:9005
+      TEST_ID: ${TEST_ID:-}
+      TEST_TYPE: ${TEST_TYPE:-}
+      DATASET: ${DATASET:-15000100}
+      BOARD_ID: ${BOARD_ID:-1}
+      TEST_BOARD_ID: ${TEST_BOARD_ID:-9001}
+      TOTAL_ARTICLES: ${TOTAL_ARTICLES:-15000100}
+      # docker compose run은 여기에 선언한 변수만 컨테이너로 전달한다.
+      # 선언을 빼먹으면 스크립트가 조용히 기본값으로 실행되므로 각 테스트의 조정 변수를 모두 나열한다.
+      RATE: ${RATE:-}
+      DURATION: ${DURATION:-}
+      ARTICLE_ID_MODE: ${ARTICLE_ID_MODE:-}
+      PAGE_SIZE: ${PAGE_SIZE:-}
+      TEST_ARTICLE_ID: ${TEST_ARTICLE_ID:-}
+      # VU 상한. 도착률에 비례해 VU를 무한정 늘리면 부하 생성기가 먼저 죽는다.
+      # 목표 4,000 RPS 단계에서 VU가 16,000까지 늘어나 로컬 Docker VM이 응답 불능이 된 적이 있어 상한을 둔다.
+      MAX_VUS_CAP: ${MAX_VUS_CAP:-}
+      # breakpoint.js
+      STAGES: ${STAGES:-}
+      STAGE_DURATION: ${STAGE_DURATION:-}
+      WARMUP: ${WARMUP:-}
+      # deep-pagination.js
+      DEEP_RATE: ${DEEP_RATE:-}
+      DEEP_DURATION: ${DEEP_DURATION:-}
+      DEEP_GAP_SECONDS: ${DEEP_GAP_SECONDS:-}
+      # spike.js / soak.js
+      STABLE_RATE: ${STABLE_RATE:-}
+      SPIKE_RATIO: ${SPIKE_RATIO:-}
+      BASE_DURATION: ${BASE_DURATION:-}
+      SPIKE_DURATION: ${SPIKE_DURATION:-}
+      RECOVER_DURATION: ${RECOVER_DURATION:-}
+      SOAK_RATIO: ${SOAK_RATIO:-}
     depends_on:
       article:
         condition: service_started

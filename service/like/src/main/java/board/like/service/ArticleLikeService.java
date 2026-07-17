@@ -14,6 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class ArticleLikeService {
@@ -41,12 +46,7 @@ public class ArticleLikeService {
                 )
         );
 
-        int result = articleLikeCountRepository.increase(articleId);
-        if (result == 0) {
-            articleLikeCountRepository.save(
-                    ArticleLikeCount.init(articleId, 1L)
-            );
-        }
+        articleLikeCountRepository.increaseOrCreate(articleId);
 
         outboxEventPublisher.publish(
                 EventType.ARTICLE_LIKED,
@@ -136,6 +136,23 @@ public class ArticleLikeService {
                     ArticleLikeCount articleLikeCount = articleLikeCountRepository.findById(articleId).orElseThrow();
                     articleLikeCount.decrease();
                 });
+    }
+
+    /**
+     * 여러 게시글의 좋아요 수를 한 번에 읽는다 (PK IN 조회 1회).
+     *
+     * <p>목록 조회는 게시글 30건의 좋아요 수를 한꺼번에 필요로 한다. 건당 조회를 30번 하면
+     * article-read -> 이 서비스로 왕복이 30번 생긴다. 그 팬아웃을 없애기 위해 추가했다.
+     * 행이 없는 게시글은 0으로 채워 반환한다.
+     */
+    public Map<Long, Long> countAll(List<Long> articleIds) {
+        if (articleIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Long> found = articleLikeCountRepository.findAllById(articleIds).stream()
+                .collect(Collectors.toMap(ArticleLikeCount::getArticleId, ArticleLikeCount::getLikeCount));
+        return articleIds.stream().distinct()
+                .collect(Collectors.toMap(Function.identity(), id -> found.getOrDefault(id, 0L)));
     }
 
     public Long count(Long articleId) {

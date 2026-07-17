@@ -76,8 +76,12 @@ CREATE TABLE IF NOT EXISTS comment.comment_v2 (
   deleted BOOLEAN NOT NULL,
   created_at DATETIME(6) NOT NULL,
   PRIMARY KEY (comment_id),
-  UNIQUE KEY uk_comment_v2_path (path),
-  KEY idx_comment_v2_article_path (article_id, path)
+  -- path 채번은 게시글 단위다(CommentRepositoryV2.findDescendantTopPath가 article_id로 범위를 좁힌다).
+  -- 그래서 모든 게시글의 첫 댓글 path가 "00000"이 된다.
+  -- unique key를 path 단독으로 두면 "00000"을 가질 수 있는 게시글이 전역에 하나뿐이라,
+  -- 두 번째 게시글부터는 첫 댓글이 반드시 Duplicate entry로 실패한다.
+  -- 유일성 범위를 채번 범위와 일치시킨다. 이 인덱스가 (article_id, path) 조회도 함께 커버한다.
+  UNIQUE KEY uk_comment_v2_article_path (article_id, path)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS comment.article_comment_count (

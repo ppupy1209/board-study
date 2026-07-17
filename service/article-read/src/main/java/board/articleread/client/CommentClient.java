@@ -6,7 +6,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
+
+import java.util.List;
+import java.util.Map;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -36,4 +40,28 @@ public class CommentClient {
         }
     }
 
+
+    /**
+     * 여러 게시글의 댓글 수를 한 번에 가져온다.
+     *
+     * <p>건당 호출을 하면 목록 30건에 왕복이 30번 생긴다. 배치 endpoint로 1번에 끝낸다.
+     * 실패하면 전부 0으로 채운 map을 돌려주고 목록 조회 자체는 살린다(기존 count()와 같은 정책).
+     */
+    public Map<Long, Long> countAll(List<Long> articleIds) {
+        if (articleIds.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            Map<Long, Long> result = restClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/v2/comments/articles/counts")
+                            .queryParam("articleIds", articleIds)
+                            .build())
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<Long, Long>>() {});
+            return result == null ? Map.of() : result;
+        } catch (Exception e) {
+            log.error("[CommentClient.countAll] articleIds size = {}", articleIds.size(), e);
+            return Map.of();
+        }
+    }
 }

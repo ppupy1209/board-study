@@ -1,3 +1,14 @@
+// [보관용 - 변경 전 baseline 스크립트]
+//
+// 이 스크립트는 변경 전 기준선을 다시 재현할 때만 쓴다. 새 테스트는 아래 스위트를 사용한다.
+//   smoke.js / average-load.js / breakpoint.js / deep-pagination.js
+//   mixed-workload.js / spike.js / soak.js / kafka-recovery.js
+//
+// 이 스크립트의 한계 (그래서 스위트를 새로 만들었다):
+//   - 도착률이 아닌 VU 기반이라 목표 처리량을 지정할 수 없다
+//   - p99, endpoint별 태그, dropped_iterations 판정이 없다
+//   - 조회 전용이라 쓰기/이벤트 경로를 검증하지 못한다
+
 import http from "k6/http";
 import { check, sleep } from "k6";
 

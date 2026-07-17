@@ -4,6 +4,7 @@ import board.comment.service.response.CommentPageResponse;
 import board.comment.service.response.CommentResponse;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,15 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
+/**
+ * [수동 실행 전용 도구 — 자동 테스트가 아니다]
+ *
+ * 실행 중인 comment 서비스에 실제 HTTP 요청을 보내는 탐색용 코드다.
+ * 서비스가 떠 있어야 하고, 실제 데이터를 생성하므로 `./gradlew test`에서 제외한다.
+ *
+ * 실행이 필요하면 서비스를 띄운 뒤 아래 @Disabled를 잠시 제거하고 실행한다.
+ */
+@Disabled("실행 중인 서비스가 필요한 수동 탐색용 도구. 자동 실행 시 실패하거나 데이터를 오염시킨다.")
 public class CommentApiV2Test {
     RestClient restClient = RestClient.create("http://localhost:9001");
 

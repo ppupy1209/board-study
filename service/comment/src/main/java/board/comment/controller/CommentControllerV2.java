@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -49,6 +50,12 @@ public class CommentControllerV2 {
             @RequestParam("pageSize") Long pageSize
     ) {
         return commentService.readAllInfiniteScroll(articleId, lastPath, pageSize);
+    }
+
+    /** 여러 게시글의 댓글 수를 한 번에 반환한다. article-read 목록 팬아웃 제거용. */
+    @GetMapping("/v2/comments/articles/counts")
+    public Map<Long, Long> countAll(@RequestParam("articleIds") List<Long> articleIds) {
+        return commentService.countAll(articleIds);
     }
 
     @GetMapping("/v2/comments/articles/{articleId}/count")

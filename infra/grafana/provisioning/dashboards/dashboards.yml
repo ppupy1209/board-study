@@ -8,4 +8,7 @@ providers:
     disableDeletion: true
     updateIntervalSeconds: 10
     options:
-      path: /var/lib/grafana/dashboards
+      # grafana-data volume이 /var/lib/grafana를 덮어 대시보드 파일이 보이지 않는 문제가 있어
+      # volume 바깥 경로에서 읽는다. docker-compose.yml의 mount 경로와 함께 봐야 한다.
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false
