@@ -36,14 +36,15 @@ services:
       timeout: 5s
       retries: 30
 
-  seed-articles:
+  seed-large:
     image: mysql:8.4
+    profiles: ["large-data"]
     entrypoint: ["/bin/bash", "/seed/seed-articles.sh"]
     environment:
       MYSQL_HOST: mysql
       MYSQL_USER: root
       MYSQL_PASSWORD: root
-      SEED_ARTICLE_COUNT: ${SEED_ARTICLE_COUNT:-15000000}
+      SEED_ARTICLE_COUNT: ${LARGE_SEED_ARTICLE_COUNT:-15000000}
       SEED_BATCH_SIZE: ${SEED_BATCH_SIZE:-100000}
     volumes:
       - ./infra/mysql/seed:/seed:ro

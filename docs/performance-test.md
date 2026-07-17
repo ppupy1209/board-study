@@ -6,14 +6,16 @@
 
 ## 데이터 적재
 
-기본 목표는 자유게시판(board ID `1`)의 대용량 글 15,000,000건입니다. 초기 100건도 같은 자유게시판에 들어가므로 완료 후 총 글 수는 15,000,100건입니다.
+기본 서비스 실행은 자유게시판(board ID `1`)의 데모 글 100건만 사용합니다. 대용량 시험이 필요할 때 아래 명령을 최초 한 번 실행하면 같은 게시판에 15,000,000건을 추가해 총 15,000,100건으로 확장합니다.
 
 ```bash
 docker compose up --build
-docker compose logs -f seed-articles
+docker compose --profile large-data run --rm seed-large
 ```
 
-적재기는 100,000건 단위로 커밋하고 `article.seed_progress`에 완료 건수를 기록합니다. 컨테이너를 중단해도 완료한 배치부터 재개합니다.
+적재기는 100,000건 단위로 커밋하고 `article.seed_progress`에 완료 건수를 기록합니다. 데이터는 로컬 `mysql-data` named volume에 남으므로 일반적인 컨테이너 재시작이나 `docker compose down` 이후에도 다시 적재하지 않습니다. 컨테이너를 중단해도 완료한 배치부터 재개합니다.
+
+> `docker compose down -v`를 실행하면 로컬 MySQL 볼륨도 삭제됩니다. 대용량 시험 데이터를 유지하려면 `-v` 옵션을 사용하지 마세요.
 
 ```sql
 SELECT seeded_count, target_count, updated_at

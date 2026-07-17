@@ -4,7 +4,8 @@ set -euo pipefail
 export MYSQL_PWD="${MYSQL_PASSWORD:-root}"
 MYSQL_HOST="${MYSQL_HOST:-mysql}"
 MYSQL_USER="${MYSQL_USER:-root}"
-TARGET="${SEED_ARTICLE_COUNT:-15000000}"
+REQUESTED_TARGET="${SEED_ARTICLE_COUNT:-15000000}"
+TARGET="${REQUESTED_TARGET}"
 BATCH_SIZE="${SEED_BATCH_SIZE:-100000}"
 SEED_NAME="free-board-15m"
 
@@ -18,15 +19,25 @@ mysql_cmd=(mysql --protocol=tcp -h "$MYSQL_HOST" -u "$MYSQL_USER" --default-char
 "${mysql_cmd[@]}" -e "
   INSERT INTO article.seed_progress (seed_name, seeded_count, target_count, updated_at)
   VALUES ('${SEED_NAME}', 0, ${TARGET}, NOW())
-  ON DUPLICATE KEY UPDATE target_count=VALUES(target_count), updated_at=NOW();
+  ON DUPLICATE KEY UPDATE
+    target_count=GREATEST(target_count, VALUES(target_count)),
+    updated_at=NOW();
 "
 
 current="$("${mysql_cmd[@]}" -Nse "SELECT seeded_count FROM article.seed_progress WHERE seed_name='${SEED_NAME}'")"
 current="${current:-0}"
 
-"${mysql_cmd[@]}" -e "UPDATE article.seed_progress SET target_count=${TARGET}, updated_at=NOW() WHERE seed_name='${SEED_NAME}'"
+if (( current > TARGET )); then
+  TARGET="${current}"
+fi
 
-echo "모두의 광장 자유게시판 dataset seed: ${current}/${TARGET}"
+"${mysql_cmd[@]}" -e "
+  UPDATE article.seed_progress
+  SET target_count=GREATEST(target_count, ${TARGET}), updated_at=NOW()
+  WHERE seed_name='${SEED_NAME}'
+"
+
+echo "모두의 광장 자유게시판 dataset seed: ${current}/${TARGET} (requested=${REQUESTED_TARGET})"
 
 while (( current < TARGET )); do
   remaining=$((TARGET - current))
@@ -86,4 +97,5 @@ done
   ANALYZE TABLE article.article;
 "
 
-echo "모두의 광장 자유게시판 dataset ready: ${TARGET} scale records plus 100 demo records"
+article_count="$("${mysql_cmd[@]}" -Nse "SELECT COUNT(*) FROM article.article WHERE board_id=1")"
+echo "모두의 광장 자유게시판 dataset ready: ${article_count} records in the persistent local volume"

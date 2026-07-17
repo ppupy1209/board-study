@@ -16,17 +16,19 @@
 docker compose up --build
 ```
 
-실행 직후 자유게시판(board ID `1`)의 100건 데모 데이터로 UI와 API를 사용할 수 있습니다. 동시에 `seed-articles` 작업이 같은 자유게시판에 1,500만 건을 10만 건 단위로 멱등 적재합니다. 완료 후 한 게시판의 총 글 수는 **15,000,100건**이며, 중단 후 다시 실행해도 마지막 완료 배치부터 이어집니다.
+실행 직후 자유게시판(board ID `1`)의 **100건 데모 데이터**로 UI와 API를 바로 사용할 수 있습니다. 기본 실행에서는 대용량 적재기를 시작하지 않습니다.
+
+1,500만 건 테스트 데이터는 아래 명령으로 **로컬 MySQL 볼륨에 한 번만** 적재합니다.
 
 ```bash
-# 적재 진행률
-docker compose logs -f seed-articles
+# 최초 1회: 자유게시판을 총 15,000,100건 규모로 확장
+docker compose --profile large-data run --rm seed-large
 
 # 1,500만 건 적재 완료 후 부하 테스트
 docker compose --profile loadtest run --rm k6
 ```
 
-> 1,500만 건은 수 GB의 디스크와 충분한 적재 시간이 필요합니다. 가벼운 로컬 확인은 `SEED_ARTICLE_COUNT=100000 docker compose up --build`처럼 목표 건수를 낮출 수 있습니다.
+대용량 데이터는 Compose의 `mysql-data` named volume에 저장됩니다. `docker compose stop`, `restart`, `down`과 컴퓨터 재부팅 후에도 유지되며, 이후 `docker compose up`은 데이터를 다시 넣지 않습니다. **`docker compose down -v`는 볼륨과 1,500만 건을 삭제하므로 사용하지 마세요.** 중간에 적재를 멈춰도 같은 명령을 다시 실행하면 마지막 10만 건 배치부터 이어집니다.
 
 ## 검증 포인트
 
