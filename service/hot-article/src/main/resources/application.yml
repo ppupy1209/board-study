@@ -1,18 +1,31 @@
-server.port: 9004
+server:
+  port: 9004
+  shutdown: graceful
 spring:
   application:
-    name: board-hot-article-service
+    name: modu-square-hot-article-service
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      group-id: board-hot-article-service
+      group-id: modu-square-hot-article-service
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       enable-auto-commit: false
 endpoints:
   board-article-service:
-    url: http://127.0.0.1:9000
+    url: ${ARTICLE_SERVICE_URL:http://127.0.0.1:9000}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      service: ${spring.application.name}

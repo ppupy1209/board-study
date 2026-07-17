@@ -1,12 +1,56 @@
 
-## 프로젝트 개요
+# 모두의 광장
 
-대규모 게시판 시스템에서 자주 사용되는 기능을 직접 구현하며 학습한 프로젝트
+> 일상부터 질문까지, 주제에 경계 없이 자유롭게 소통하는 1,500만 건 규모 이벤트 기반 커뮤니티
+
+모두의 광장은 강의 코드를 따라 작성한 흔적에 머물지 않고, 실제 사용자가 보는 자유게시판 UI·한 번에 실행되는 로컬 인프라·재현 가능한 대용량 데이터·부하 테스트·관측성까지 갖춘 서비스형 프로젝트입니다.
+
+- Web UI: `http://localhost:3000`
+- Grafana: `http://localhost:3001` (`admin` / `admin`, 로컬 전용)
+- Prometheus: `http://localhost:9090`
+- Article API: `http://localhost:9000`
+
+## 3분 실행
+
+```bash
+docker compose up --build
+```
+
+실행 직후 자유게시판(board ID `1`)의 100건 데모 데이터로 UI와 API를 사용할 수 있습니다. 동시에 `seed-articles` 작업이 같은 자유게시판에 1,500만 건을 10만 건 단위로 멱등 적재합니다. 완료 후 한 게시판의 총 글 수는 **15,000,100건**이며, 중단 후 다시 실행해도 마지막 완료 배치부터 이어집니다.
+
+```bash
+# 적재 진행률
+docker compose logs -f seed-articles
+
+# 1,500만 건 적재 완료 후 부하 테스트
+docker compose --profile loadtest run --rm k6
+```
+
+> 1,500만 건은 수 GB의 디스크와 충분한 적재 시간이 필요합니다. 가벼운 로컬 확인은 `SEED_ARTICLE_COUNT=100000 docker compose up --build`처럼 목표 건수를 낮출 수 있습니다.
+
+## 검증 포인트
+
+| 주제 | 구현 | 확인 위치 |
+|---|---|---|
+| 대용량 목록 조회 | Covering Index + ID 선조회 JOIN, 무한 스크롤 Keyset | `ArticleRepository`, [개발 기록](docs/development-log.md#2-1500만-건-자유게시판-목록-조회-최적화) |
+| 이벤트 전달 신뢰성 | Transactional Outbox + 즉시 발행 + 미발행 재처리 | `common:outbox-message-relay` |
+| 조회 모델 분리 | CQRS 읽기 모델 + Redis Sorted Set + Request Collapsing | `service:article-read` |
+| 실시간 인기글 | Kafka 이벤트 + Redis ZSet | `service:hot-article` |
+| 관측성 | Spring Actuator + Prometheus + Grafana | `infra/` |
+| 부하 검증 | 일반 목록과 깊은 페이지를 분리한 k6 시나리오 | `load-tests/k6/` |
+
+개발 과정의 선택 이유와 한계는 [개발 기록](docs/development-log.md), 대용량 실험 재현 절차는 [성능 테스트 가이드](docs/performance-test.md)에 정리했습니다.
+
+---
+
+## 프로젝트 배경
+
+대규모 게시판 시스템에서 자주 사용되는 기능을 직접 구현한 뒤, 서비스 형태로 확장한 프로젝트
 
 게시글, 댓글, 좋아요, 조회수, 인기글 기능을 하나의 애플리케이션에 모두 넣기보다 각각의 책임을 나누어 모듈로 분리  
 Kafka 기반 이벤트 처리와 Outbox Pattern을 적용해 서비스 간 데이터 변경 이벤트를 안정적으로 전달하는 구조 실습
 
-단순 CRUD보다 아래 내용에 집중
+단순 CRUD보다 아래 내용에 집중했습니다.
 
 - 멀티 모듈 기반 게시판 구조 설계
 - 게시글, 댓글, 좋아요, 조회수 기능 분리
@@ -46,7 +90,7 @@ Kafka 기반 이벤트 처리와 Outbox Pattern을 적용해 서비스 간 데�
 ## 모듈 구조
 
 ```text
-board-study
+modu-square
 ├── common
 │   ├── snowflake
 │   ├── data-serializer
@@ -60,6 +104,14 @@ board-study
     ├── hot-article
     ├── like
     └── view
+├── web
+│   └── Apple Design 원칙을 적용한 커뮤니티 UI
+├── infra
+│   ├── mysql
+│   ├── prometheus
+│   └── grafana
+└── load-tests
+    └── k6
 ```
 
 ### 모듈별 역할
@@ -326,4 +378,3 @@ DB Auto Increment에 의존하지 않고 분산 환경에서도 고유 ID를 생
 - Snowflake 기반 ID 생성
 
 ---
-

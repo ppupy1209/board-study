@@ -1,0 +1,231 @@
+name: modu-square
+
+x-service-environment: &service-environment
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  JPA_SHOW_SQL: "false"
+
+x-service-dependencies: &service-dependencies
+  mysql:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  kafka:
+    condition: service_started
+
+services:
+  mysql:
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --innodb-buffer-pool-size=1G
+      - --max-allowed-packet=64M
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Seoul
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./infra/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -proot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  seed-articles:
+    image: mysql:8.4
+    entrypoint: ["/bin/bash", "/seed/seed-articles.sh"]
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      SEED_ARTICLE_COUNT: ${SEED_ARTICLE_COUNT:-15000000}
+      SEED_BATCH_SIZE: ${SEED_BATCH_SIZE:-100000}
+    volumes:
+      - ./infra/mysql/seed:/seed:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:3.8.0
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  article:
+    build:
+      context: .
+      args: { SERVICE: article }
+    environment:
+      <<: *service-environment
+      DB_URL: jdbc:mysql://mysql:3306/article
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+    ports: ["9000:9000"]
+    depends_on: *service-dependencies
+    restart: unless-stopped
+
+  comment:
+    build:
+      context: .
+      args: { SERVICE: comment }
+    environment:
+      <<: *service-environment
+      DB_URL: jdbc:mysql://mysql:3306/comment
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    ports: ["9001:9001"]
+    depends_on: *service-dependencies
+    restart: unless-stopped
+
+  like:
+    build:
+      context: .
+      args: { SERVICE: like }
+    environment:
+      <<: *service-environment
+      DB_URL: jdbc:mysql://mysql:3306/article_like
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    ports: ["9002:9002"]
+    depends_on: *service-dependencies
+    restart: unless-stopped
+
+  view:
+    build:
+      context: .
+      args: { SERVICE: view }
+    environment:
+      <<: *service-environment
+      DB_URL: jdbc:mysql://mysql:3306/article_view
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    ports: ["9003:9003"]
+    depends_on: *service-dependencies
+    restart: unless-stopped
+
+  hot-article:
+    build:
+      context: .
+      args: { SERVICE: hot-article }
+    environment:
+      <<: *service-environment
+      ARTICLE_SERVICE_URL: http://article:9000
+    ports: ["9004:9004"]
+    depends_on: *service-dependencies
+    restart: unless-stopped
+
+  article-read:
+    build:
+      context: .
+      args: { SERVICE: article-read }
+    environment:
+      <<: *service-environment
+      ARTICLE_SERVICE_URL: http://article:9000
+      COMMENT_SERVICE_URL: http://comment:9001
+      LIKE_SERVICE_URL: http://like:9002
+      VIEW_SERVICE_URL: http://view:9003
+    ports: ["9005:9005"]
+    depends_on: *service-dependencies
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:9000
+    ports: ["3000:3000"]
+    depends_on:
+      article:
+        condition: service_started
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    ports: ["9090:9090"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - article
+      - comment
+      - like
+      - view
+      - hot-article
+      - article-read
+
+  mysql-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    command: ["--config.my-cnf=/cfg/.my.cnf"]
+    volumes:
+      - ./infra/mysql-exporter/.my.cnf:/cfg/.my.cnf:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports: ["3001:3000"]
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  k6:
+    image: grafana/k6:0.57.0
+    profiles: ["loadtest"]
+    volumes:
+      - ./load-tests/k6:/scripts:ro
+    command: run /scripts/article-list.js
+    environment:
+      BASE_URL: http://article:9000
+    depends_on:
+      article:
+        condition: service_started
+
+volumes:
+  mysql-data:
+  redis-data:
+  kafka-data:
+  prometheus-data:
+  grafana-data:

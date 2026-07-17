@@ -1,0 +1,7 @@
+.git
+.gradle
+**/build
+web
+docs
+load-tests
+**/.DS_Store

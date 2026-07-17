@@ -1,1 +1,37 @@
-server.port: 9005
+server:
+  port: 9005
+  shutdown: graceful
+spring:
+  application:
+    name: modu-square-article-read-service
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: modu-square-article-read-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+endpoints:
+  board-article-service:
+    url: ${ARTICLE_SERVICE_URL:http://127.0.0.1:9000}
+  board-comment-service:
+    url: ${COMMENT_SERVICE_URL:http://127.0.0.1:9001}
+  board-like-service:
+    url: ${LIKE_SERVICE_URL:http://127.0.0.1:9002}
+  board-view-service:
+    url: ${VIEW_SERVICE_URL:http://127.0.0.1:9003}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      service: ${spring.application.name}

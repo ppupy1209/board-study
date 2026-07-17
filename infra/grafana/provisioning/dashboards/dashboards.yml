@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 모두의 광장
+    orgId: 1
+    folder: 모두의 광장
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards

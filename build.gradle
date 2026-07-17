@@ -23,6 +23,8 @@ allprojects {
 
 	dependencies {
 		implementation 'ch.qos.logback:logback-classic'
+		implementation 'org.springframework.boot:spring-boot-starter-actuator'
+		runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
 		compileOnly 'org.projectlombok:lombok'
 		annotationProcessor 'org.projectlombok:lombok'
@@ -38,5 +40,4 @@ allprojects {
 		useJUnitPlatform()
 	}
 }
-
 

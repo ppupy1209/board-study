@@ -1,4 +1,4 @@
-rootProject.name = 'board-study'
+rootProject.name = 'modu-square'
 
 include 'common'
 include 'common:snowflake'

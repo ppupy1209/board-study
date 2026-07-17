@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: modu-square-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - article:9000
+          - comment:9001
+          - like:9002
+          - view:9003
+          - hot-article:9004
+          - article-read:9005
+
+  - job_name: modu-square-mysql
+    static_configs:
+      - targets: [mysql-exporter:9104]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: [prometheus:9090]
