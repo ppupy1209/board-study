@@ -1,8 +1,10 @@
 export const ARTICLE_API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:9000";
+export const ARTICLE_READ_API = process.env.NEXT_PUBLIC_ARTICLE_READ_API_BASE_URL ?? "http://localhost:9005";
 export const COMMENT_API = process.env.NEXT_PUBLIC_COMMENT_API_BASE_URL ?? "http://localhost:9001";
 export const LIKE_API = process.env.NEXT_PUBLIC_LIKE_API_BASE_URL ?? "http://localhost:9002";
 export const VIEW_API = process.env.NEXT_PUBLIC_VIEW_API_BASE_URL ?? "http://localhost:9003";
 export const HOT_ARTICLE_API = process.env.NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL ?? "http://localhost:9004";
+export const NOTIFICATION_API = process.env.NEXT_PUBLIC_NOTIFICATION_API_BASE_URL ?? "http://localhost:9006";
 
 export const BOARD_ID = "1";
 export const LOCAL_USER_ID = "1";
@@ -35,6 +37,16 @@ export type HotArticle = {
   articleId: string;
   title: string;
   createdAt?: string;
+};
+
+export type Notification = {
+  notificationId: string;
+  articleId: string;
+  title: string;
+  commentCount: number;
+  likeCount: number;
+  eventCount: number;
+  updatedAt: string;
 };
 
 const communityStories = [

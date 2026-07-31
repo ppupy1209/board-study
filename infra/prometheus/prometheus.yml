@@ -13,6 +13,7 @@ scrape_configs:
           - view:9003
           - hot-article:9004
           - article-read:9005
+          - notification:9006
 
   - job_name: modu-square-mysql
     static_configs:

@@ -1,0 +1,31 @@
+server:
+  port: 9006
+  shutdown: graceful
+spring:
+  application:
+    name: modu-square-notification-service
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: modu-square-notification-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+endpoints:
+  board-article-service:
+    url: ${ARTICLE_SERVICE_URL:http://127.0.0.1:9000}
+notification:
+  bundle-window: 5m
+  retention: 7d
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      service: ${spring.application.name}

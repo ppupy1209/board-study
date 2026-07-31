@@ -184,14 +184,28 @@ services:
     depends_on: *service-dependencies
     restart: unless-stopped
 
+  notification:
+    build:
+      context: .
+      args: { SERVICE: notification }
+    mem_limit: 448m
+    environment:
+      <<: *service-environment
+      ARTICLE_SERVICE_URL: http://article:9000
+    ports: ["9006:9006"]
+    depends_on: *service-dependencies
+    restart: unless-stopped
+
   web:
     build: ./web
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:9000
+      NEXT_PUBLIC_ARTICLE_READ_API_BASE_URL: http://localhost:9005
       NEXT_PUBLIC_COMMENT_API_BASE_URL: http://localhost:9001
       NEXT_PUBLIC_LIKE_API_BASE_URL: http://localhost:9002
       NEXT_PUBLIC_VIEW_API_BASE_URL: http://localhost:9003
       NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL: http://localhost:9004
+      NEXT_PUBLIC_NOTIFICATION_API_BASE_URL: http://localhost:9006
     ports: ["${WEB_PORT:-3000}:3000"]
     depends_on:
       article:
@@ -203,6 +217,8 @@ services:
       view:
         condition: service_started
       hot-article:
+        condition: service_started
+      notification:
         condition: service_started
     restart: unless-stopped
 
@@ -224,6 +240,7 @@ services:
       - view
       - hot-article
       - article-read
+      - notification
 
   mysql-exporter:
     image: prom/mysqld-exporter:v0.15.1
@@ -313,6 +330,7 @@ services:
       VIEW_URL: http://view:9003
       HOT_ARTICLE_URL: http://hot-article:9004
       ARTICLE_READ_URL: http://article-read:9005
+      NOTIFICATION_URL: http://notification:9006
       TEST_ID: ${TEST_ID:-}
       TEST_TYPE: ${TEST_TYPE:-}
       DATASET: ${DATASET:-15000100}

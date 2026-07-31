@@ -256,7 +256,7 @@ export function ModuSquareApp() {
             <div className="article-list">
               {filtered.map((article, index) => (
                 <article className="article-card" key={`${article.articleId}-${index}`}>
-                  <div className="vote-rail" aria-label={`공감 ${article.articleLikeCount ?? 0}개`}>
+                  <div className="vote-rail" aria-label={`좋아요 ${article.articleLikeCount ?? 0}개`}>
                     <span>♡</span><strong>{formatCompact(article.articleLikeCount)}</strong>
                   </div>
                   <Link className="article-body article-link" href={`/articles/${article.articleId}`}>

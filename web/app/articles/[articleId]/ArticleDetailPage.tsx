@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { CommunityFooter, CommunityHeader, CommunityPage } from "../../CommunityChrome";
 import {
   ARTICLE_API,
+  ARTICLE_READ_API,
   COMMENT_API,
   LIKE_API,
   VIEW_API,
@@ -46,18 +47,19 @@ export function ArticleDetailPage() {
     async function load() {
       setIsLoading(true);
       try {
-        const articleData = await requestJson<Article>(`${ARTICLE_API}/v1/articles/${articleId}`);
+        const articleData = await requestJson<Article>(`${ARTICLE_READ_API}/v1/articles/${articleId}`);
         if (cancelled) return;
         setArticle(normalizeArticle({ ...articleData, articleId: String(articleData.articleId), writerId: String(articleData.writerId) }));
+        setCommentCount(articleData.articleCommentCount ?? 0);
+        setLikeCount(articleData.articleLikeCount ?? 0);
+        setViewCount(articleData.articleViewCount ?? 0);
 
-        const [commentsResult, likeCountResult, viewResult, likedResult] = await Promise.allSettled([
+        const [commentsResult, viewResult, likedResult] = await Promise.allSettled([
           loadComments(),
-          requestJson<number>(`${LIKE_API}/v1/article-likes/articles/${articleId}/count`),
           requestJson<number>(`${VIEW_API}/v1/article-views/articles/${articleId}/users/${LOCAL_USER_ID}`, { method: "POST" }),
           fetch(`${LIKE_API}/v1/article-likes/articles/${articleId}/users/${LOCAL_USER_ID}`),
         ]);
         if (cancelled) return;
-        if (likeCountResult.status === "fulfilled") setLikeCount(likeCountResult.value);
         if (viewResult.status === "fulfilled") setViewCount(viewResult.value);
         if (likedResult.status === "fulfilled") setLiked(likedResult.value.ok);
         if (commentsResult.status === "rejected") setComments([]);
@@ -81,11 +83,11 @@ export function ArticleDetailPage() {
       await requestJson<void>(`${LIKE_API}/v1/article-likes/articles/${articleId}/users/${LOCAL_USER_ID}/optimistic-lock`, {
         method: nextLiked ? "POST" : "DELETE",
       });
-      setNotice(nextLiked ? "이 이야기에 공감했어요." : "공감을 취소했어요.");
+      setNotice(nextLiked ? "이 이야기를 좋아합니다." : "좋아요를 취소했습니다.");
     } catch (cause) {
       setLiked(!nextLiked);
       setLikeCount((count) => Math.max(0, count + (nextLiked ? -1 : 1)));
-      setNotice(cause instanceof Error ? cause.message : "공감을 반영하지 못했습니다.");
+      setNotice(cause instanceof Error ? cause.message : "좋아요를 반영하지 못했습니다.");
     } finally {
       setIsWorking(false);
     }
@@ -155,7 +157,7 @@ export function ArticleDetailPage() {
               <p className="detail-content">{article.content}</p>
               <div className="detail-actions">
                 <button className={`reaction-button ${liked ? "liked" : ""}`} type="button" onClick={toggleLike} disabled={isWorking} aria-pressed={liked}>
-                  <span>{liked ? "♥" : "♡"}</span> 공감 {likeCount.toLocaleString("ko-KR")}
+                  <span>{liked ? "♥" : "♡"}</span> 좋아요 {likeCount.toLocaleString("ko-KR")}
                 </button>
                 <span>◌ 댓글 {commentCount.toLocaleString("ko-KR")}</span>
                 <span>◎ 읽음 {viewCount.toLocaleString("ko-KR")}</span>
