@@ -5,13 +5,17 @@ import board.common.event.EventPayload;
 import board.common.event.payload.EventType;
 import board.hotarticle.client.ArticleClient;
 import board.hotarticle.repository.HotArticleListRepository;
+import board.hotarticle.repository.HotArticleQueryModel;
+import board.hotarticle.repository.HotArticleQueryModelRepository;
 import board.hotarticle.service.eventhandler.EventHandler;
 import board.hotarticle.service.response.HotArticleResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Slf4j
@@ -22,6 +26,8 @@ public class HotArticleService {
     private final List<EventHandler> eventHandlers;
     private final HotArticleScoreUpdater hotArticleScoreUpdater;
     private final HotArticleListRepository hotArticleListRepository;
+    private final HotArticleQueryModelRepository hotArticleQueryModelRepository;
+    private final HotArticleReadModelMetrics hotArticleReadModelMetrics;
 
     public void handleEvent(Event<EventPayload> event) {
         EventHandler<EventPayload> eventHandler = findEventHandler(event);
@@ -29,15 +35,17 @@ public class HotArticleService {
             return;
         }
 
-        if (isArticleCreatedOrDeleted(event)) {
+        if (isArticleProjectionEvent(event)) {
             eventHandler.handle(event);
         } else {
             hotArticleScoreUpdater.update(event, eventHandler);
         }
     }
 
-    private boolean isArticleCreatedOrDeleted(Event<EventPayload> event) {
-        return EventType.ARTICLE_CREATED == event.getType() || EventType.ARTICLE_DELETED == event.getType();
+    private boolean isArticleProjectionEvent(Event<EventPayload> event) {
+        return EventType.ARTICLE_CREATED == event.getType()
+                || EventType.ARTICLE_UPDATED == event.getType()
+                || EventType.ARTICLE_DELETED == event.getType();
     }
 
     private EventHandler<EventPayload> findEventHandler(Event<EventPayload> event) {
@@ -48,8 +56,30 @@ public class HotArticleService {
     }
 
     public List<HotArticleResponse> readAll(String dateStr) {
-        return hotArticleListRepository.readALl(dateStr).stream()
-                .map(articleClient::read)
+        List<Long> articleIds = hotArticleListRepository.readAll(dateStr);
+        Map<Long, HotArticleQueryModel> queryModels = new LinkedHashMap<>(
+                hotArticleQueryModelRepository.readAll(articleIds)
+        );
+
+        List<Long> missingArticleIds = articleIds.stream()
+                .filter(articleId -> !queryModels.containsKey(articleId))
+                .toList();
+        hotArticleReadModelMetrics.hit(articleIds.size() - missingArticleIds.size());
+        hotArticleReadModelMetrics.miss(missingArticleIds.size());
+
+        for (Long articleId : missingArticleIds) {
+            hotArticleReadModelMetrics.originCall(1);
+            ArticleClient.ArticleResponse article = articleClient.read(articleId);
+            if (article == null) {
+                continue;
+            }
+            HotArticleQueryModel queryModel = HotArticleQueryModel.create(article);
+            hotArticleQueryModelRepository.createOrUpdate(queryModel);
+            queryModels.put(articleId, queryModel);
+        }
+
+        return articleIds.stream()
+                .map(queryModels::get)
                 .filter(Objects::nonNull)
                 .map(HotArticleResponse::from)
                 .toList();

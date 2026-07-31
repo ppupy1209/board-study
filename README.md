@@ -51,6 +51,10 @@ TEST_ID=deep-1 docker compose run --rm k6 run -o experimental-prometheus-rw /scr
 # 실제 사용자 혼합 트래픽 (조회 + 쓰기)
 TEST_ID=mixed-1 RATE=100 DURATION=5m docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/mixed-workload.js
 
+# 인기글 Top 10 조회의 호출 증폭과 CQRS 조회 모델 비교
+TEST_ID=hot-1 HOT_ARTICLE_DATE=20260731 HOT_RATES=75,100,150,200,250 \
+  docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/hot-article-list.js
+
 # 급증 / 장시간 (STABLE_RATE는 breakpoint 실측값을 넣습니다)
 TEST_ID=spike-1 STABLE_RATE=1000 docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/spike.js
 TEST_ID=soak-1 STABLE_RATE=1000 DURATION=60m docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/soak.js
@@ -84,7 +88,7 @@ Grafana의 **모두의 광장 성능·병목 분석** 대시보드에서 `testid
 | 부하 검증 | smoke/average/breakpoint/deep-page/mixed/spike/soak/kafka-recovery 분리 | `load-tests/k6/` |
 | 동시성 정확성 | count 행 원자적 upsert로 deadlock 제거 | `BoardArticleCountRepository`, `ArticleCommentCountRepository`, `ArticleLikeCountRepository` |
 
-개발 과정의 선택 이유와 한계는 [개발 기록](docs/development-log.md), 대용량 실험 재현 절차는 [성능 테스트 가이드](docs/performance-test.md)에 정리했습니다.
+개발 과정의 선택 이유와 한계는 [개발 기록](docs/development-log.md), 대용량 실험 재현 절차는 [성능 테스트 가이드](docs/performance-test.md), 인기글 호출 증폭 개선은 [인기글 조회 부하 테스트](docs/hot-article-load-test.md)에 정리했습니다.
 
 ### 실측 요약 (자유게시판 15,000,100건, 로컬 단일 머신)
 

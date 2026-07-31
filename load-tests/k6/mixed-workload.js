@@ -132,7 +132,7 @@ export default function () {
     }
   } else {
     // 3% 인기글 조회
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10).replaceAll("-", "");
     const res = get(`${urls.hotArticle}/v1/hot-articles/articles/date/${today}`, {
       name: "mx_hot",
       endpoint: "GET /v1/hot-articles/articles/date/{dateStr}",

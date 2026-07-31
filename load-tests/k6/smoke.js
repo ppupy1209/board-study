@@ -118,7 +118,7 @@ export default function () {
   checkStatus(comments, "comment_list");
 
   // 10. 인기글 조회 (hot-article-service)
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   const hot = get(`${urls.hotArticle}/v1/hot-articles/articles/date/${today}`, {
     name: "hot_articles",
     endpoint: "GET /v1/hot-articles/articles/date/{dateStr}",

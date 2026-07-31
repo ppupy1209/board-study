@@ -2,19 +2,15 @@ package board.hotarticle.service;
 
 import board.common.event.Event;
 import board.common.event.EventPayload;
-import board.hotarticle.client.ArticleClient;
 import board.hotarticle.repository.ArticleCreatedTimeRepository;
 import board.hotarticle.repository.HotArticleListRepository;
 import board.hotarticle.service.eventhandler.EventHandler;
-import board.hotarticle.service.response.HotArticleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -25,7 +21,6 @@ public class HotArticleScoreUpdater {
 
     private static final long HOT_ARTICLE_COUNT = 10;
     private static final Duration HOT_ARTICLE_TTL = Duration.ofDays(10);
-    private final ArticleClient articleClient;
 
     public void update(Event<EventPayload> event, EventHandler<EventPayload> eventHandler) {
         Long articleId = eventHandler.findArticleId(event);
@@ -51,11 +46,4 @@ public class HotArticleScoreUpdater {
         return createdTime != null && createdTime.toLocalDate().equals(LocalDate.now());
     }
 
-    public List<HotArticleResponse> readAll(String dateStr) {
-        return hotArticleListRepository.readALl(dateStr).stream()
-                .map(articleClient::read)
-                .filter(Objects::nonNull)
-                .map(HotArticleResponse::from)
-                .toList();
-    }
 }

@@ -44,4 +44,14 @@ class HotArticleScoreCalculatorTest {
         assertThat(score)
                 .isEqualTo(3*likeCount + 2*commentCount + viewCount);
     }
+
+    @Test
+    void calculateWithMissingCountTest() {
+        Long articleId = 1L;
+        given(articleLikeCountRepository.read(articleId)).willReturn(null);
+        given(articleViewCountRepository.read(articleId)).willReturn(100L);
+        given(articleCommentCountRepository.read(articleId)).willReturn(0L);
+
+        assertThat(hotArticleScoreCalculator.calculate(articleId)).isEqualTo(100L);
+    }
 }

@@ -5,6 +5,7 @@ import board.common.event.payload.ArticleDeletedEventPayload;
 import board.common.event.payload.EventType;
 import board.hotarticle.repository.ArticleCreatedTimeRepository;
 import board.hotarticle.repository.HotArticleListRepository;
+import board.hotarticle.repository.HotArticleQueryModelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,11 +14,13 @@ import org.springframework.stereotype.Component;
 public class ArticleDeletedEventHandler implements EventHandler<ArticleDeletedEventPayload> {
     private final HotArticleListRepository hotArticleListRepository;
     private final ArticleCreatedTimeRepository articleCreatedTimeRepository;
+    private final HotArticleQueryModelRepository hotArticleQueryModelRepository;
 
     @Override
     public void handle(Event<ArticleDeletedEventPayload> event) {
         ArticleDeletedEventPayload payload = event.getPayload();
         articleCreatedTimeRepository.delete(payload.getArticleId());
+        hotArticleQueryModelRepository.delete(payload.getArticleId());
         hotArticleListRepository.remove(payload.getArticleId(), payload.getCreatedAt());
     }
 

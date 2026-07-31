@@ -1,0 +1,192 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "외부 요청과 내부 Article Service 호출",
+      "description": "인기글 목록 요청과 게시글 단건 조회 호출의 증폭 비율을 비교합니다.",
+      "id": 1,
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\"}[30s]))",
+          "legendFormat": "k6 외부 요청",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{service=\"modu-square-hot-article-service\",uri=\"/v1/hot-articles/articles/date/{dateStr}\"}[30s]))",
+          "legendFormat": "Hot Article Service",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{service=\"modu-square-article-service\",uri=\"/v1/articles/{articleId}\"}[30s]))",
+          "legendFormat": "Article Service 단건 조회",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "인기글 목록 응답 시간",
+      "description": "k6에서 측정한 p95와 p99 응답 시간입니다.",
+      "id": 2,
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "max(k6_http_req_duration_p95{testid=~\"$testid\",stage=~\"$stage\"})",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "max(k6_http_req_duration_p99{testid=~\"$testid\",stage=~\"$stage\"})",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "MySQL과 Redis 처리량",
+      "description": "조회 경로 변경 전후에 저장소 부하가 어떻게 이동했는지 비교합니다.",
+      "id": 3,
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_queries[30s])",
+          "legendFormat": "MySQL QPS",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(redis_commands_processed_total[30s])",
+          "legendFormat": "Redis commands/s",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "인기글 조회 모델 적중과 보완 호출",
+      "description": "조회 모델 hit·miss와 누락 시 Article Service 보완 호출을 확인합니다.",
+      "id": 4,
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(modu_hot_article_read_model_requests_total[30s]))",
+          "legendFormat": "조회 모델 {{result}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(modu_hot_article_read_model_origin_calls_total[30s]))",
+          "legendFormat": "Article Service 보완 호출",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "tags": ["modu-square", "hot-article", "load-test"],
+  "templating": {
+    "list": [
+      {
+        "name": "testid",
+        "type": "query",
+        "label": "테스트 실행",
+        "query": { "query": "label_values(k6_http_reqs_total, testid)", "refId": "testid" },
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 5
+      },
+      {
+        "name": "stage",
+        "type": "query",
+        "label": "요청률 단계",
+        "query": { "query": "label_values(k6_http_req_duration_p95{testid=~\"$testid\"}, stage)", "refId": "stage" },
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
+      }
+    ]
+  },
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "title": "Modu Square 인기글 부하 테스트",
+  "uid": "modu-square-hot-article",
+  "version": 1
+}

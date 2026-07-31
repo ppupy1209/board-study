@@ -29,14 +29,14 @@ class HotArticleListRepositoryTest {
         hotArticleListRepository.add(4L, time, 5L, limit, Duration.ofSeconds(3));
         hotArticleListRepository.add(5L, time, 4L, limit, Duration.ofSeconds(3));
 
-        List<Long> articleIds = hotArticleListRepository.readALl("20240723");
+        List<Long> articleIds = hotArticleListRepository.readAll("20240723");
 
         assertThat(articleIds).hasSize(Long.valueOf(limit).intValue());
         assertThat(articleIds.get(0)).isEqualTo(4L);
 
         TimeUnit.SECONDS.sleep(5);
 
-        assertThat(hotArticleListRepository.readALl("20240723")).isEmpty();
+        assertThat(hotArticleListRepository.readAll("20240723")).isEmpty();
     }
 
 }

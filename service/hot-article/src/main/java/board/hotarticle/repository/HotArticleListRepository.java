@@ -1,7 +1,6 @@
 package board.hotarticle.repository;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.StringRedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -13,7 +12,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class HotArticleListRepository {
@@ -46,11 +44,9 @@ public class HotArticleListRepository {
         return KEY_FORMAT.formatted(dateStr);
     }
 
-    public List<Long> readALl(String dateStr) {
+    public List<Long> readAll(String dateStr) {
         return redisTemplate.opsForZSet()
                 .reverseRangeWithScores(generateKey(dateStr), 0, -1).stream()
-                .peek(tuple ->
-                        log.info("[HotArticleListRepository.readAll] articleId={}, score={}", tuple.getValue(), tuple.getScore()))
                 .map(ZSetOperations.TypedTuple::getValue)
                 .map(Long::valueOf)
                 .toList();

@@ -22,8 +22,12 @@ public class HotArticleScoreCalculator {
         Long articleCommentCount = articleCommentCountRepository.read(articleId);
         Long articleViewCount = articleViewCountRepository.read(articleId);
 
-        return articleLikeCount * ARTICLE_LIKE_COUNT_WEIGHT
-                + articleCommentCount * ARTICLE_COMMENT_COUNT_WEIGHT
-                + articleViewCount * ARTICLE_VIEW_COUNT_WEIGHT;
+        return valueOrZero(articleLikeCount) * ARTICLE_LIKE_COUNT_WEIGHT
+                + valueOrZero(articleCommentCount) * ARTICLE_COMMENT_COUNT_WEIGHT
+                + valueOrZero(articleViewCount) * ARTICLE_VIEW_COUNT_WEIGHT;
+    }
+
+    private long valueOrZero(Long count) {
+        return count == null ? 0L : count;
     }
 }
