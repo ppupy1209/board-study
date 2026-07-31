@@ -5,7 +5,7 @@ x-service-environment: &service-environment
   REDIS_PORT: 6379
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   JPA_SHOW_SQL: "false"
-  CORS_ALLOWED_ORIGINS: http://localhost:3000
+  CORS_ALLOWED_ORIGINS: "http://localhost:${WEB_PORT:-3000}"
 
 x-service-dependencies: &service-dependencies
   mysql:
@@ -192,7 +192,7 @@ services:
       NEXT_PUBLIC_LIKE_API_BASE_URL: http://localhost:9002
       NEXT_PUBLIC_VIEW_API_BASE_URL: http://localhost:9003
       NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL: http://localhost:9004
-    ports: ["3000:3000"]
+    ports: ["${WEB_PORT:-3000}:3000"]
     depends_on:
       article:
         condition: service_started
@@ -227,7 +227,8 @@ services:
 
   mysql-exporter:
     image: prom/mysqld-exporter:v0.15.1
-    command: ["--config.my-cnf=/cfg/.my.cnf"]
+    # 로컬 단일 MySQL은 replication을 사용하지 않으므로 MySQL 8.4에서 제거된 SHOW SLAVE STATUS 수집을 끈다.
+    command: ["--config.my-cnf=/cfg/.my.cnf", "--no-collect.slave_status"]
     volumes:
       - ./infra/mysql-exporter/.my.cnf:/cfg/.my.cnf:ro
     depends_on:
