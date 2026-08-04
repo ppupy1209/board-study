@@ -1,0 +1,185 @@
+{
+    "annotations":  {
+                        "list":  [
+
+                                 ]
+                    },
+    "editable":  true,
+    "graphTooltip":  1,
+    "panels":  [
+                   {
+                       "type":  "timeseries",
+                       "title":  "외부 요청과 Article Service 원본 조회",
+                       "description":  "동일한 존재하지 않는 게시글 ID에 요청한 100 req/s와 원본 서비스로 전달된 호출을 비교합니다.",
+                       "id":  1,
+                       "gridPos":  {
+                                       "h":  9,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  0
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum by (testid) (rate(k6_http_reqs_total{testid=~\"cache-penetration-(before|after)-20260804\"}[30s]))",
+                                           "legendFormat":  "외부 요청 {{testid}}",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "sum(rate(http_server_requests_seconds_count{service=\"modu-square-article-service\",method=\"GET\",uri=\"/v1/articles/{articleId}\"}[30s]))",
+                                           "legendFormat":  "Article Service 원본 조회",
+                                           "refId":  "B"
+                                       }
+                                   ],
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "reqps",
+                                                            "min":  0,
+                                                            "custom":  {
+                                                                           "drawStyle":  "line",
+                                                                           "lineWidth":  2,
+                                                                           "fillOpacity":  10,
+                                                                           "showPoints":  "never",
+                                                                           "spanNulls":  true
+                                                                       }
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "bottom",
+                                                      "calcs":  [
+                                                                    "mean",
+                                                                    "max"
+                                                                ]
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   }
+                   },
+                   {
+                       "type":  "timeseries",
+                       "title":  "부재 캐시 저장과 적중",
+                       "description":  "최초 원본 404를 저장한 뒤 후속 요청이 부재 캐시에서 차단되는 흐름입니다.",
+                       "id":  2,
+                       "gridPos":  {
+                                       "h":  9,
+                                       "w":  12,
+                                       "x":  0,
+                                       "y":  9
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum by (result) (rate(modu_article_missing_cache_events_total{service=\"modu-square-article-read-service\"}[30s]))",
+                                           "legendFormat":  "{{result}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "reqps",
+                                                            "min":  0,
+                                                            "custom":  {
+                                                                           "drawStyle":  "line",
+                                                                           "lineWidth":  2,
+                                                                           "fillOpacity":  10,
+                                                                           "showPoints":  "never",
+                                                                           "spanNulls":  true
+                                                                       }
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "bottom",
+                                                      "calcs":  [
+                                                                    "mean",
+                                                                    "max"
+                                                                ]
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   }
+                   },
+                   {
+                       "type":  "bargauge",
+                       "title":  "변경 전·후 p95",
+                       "description":  "각 30초 구간에서 k6가 집계한 최종 p95를 비교합니다.",
+                       "id":  3,
+                       "gridPos":  {
+                                       "h":  9,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  9
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "max(last_over_time(k6_http_req_duration_p95{testid=\"cache-penetration-before-20260804\"}[2h])) * 1000",
+                                           "legendFormat":  "변경 전",
+                                           "refId":  "A",
+                                           "instant":  true
+                                       },
+                                       {
+                                           "expr":  "max(last_over_time(k6_http_req_duration_p95{testid=\"cache-penetration-after-20260804\"}[2h])) * 1000",
+                                           "legendFormat":  "부재 캐시 적용 후",
+                                           "refId":  "B",
+                                           "instant":  true
+                                       }
+                                   ],
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "ms",
+                                                            "min":  0,
+                                                            "decimals":  2
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "options":  {
+                                       "displayMode":  "gradient",
+                                       "orientation":  "horizontal",
+                                       "reduceOptions":  {
+                                                             "values":  false,
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  ""
+                                                         },
+                                       "showUnfilled":  true
+                                   }
+                   }
+               ],
+    "refresh":  false,
+    "schemaVersion":  40,
+    "tags":  [
+                 "modu-square",
+                 "cache",
+                 "load-test"
+             ],
+    "templating":  {
+                       "list":  [
+
+                                ]
+                   },
+    "time":  {
+                 "from":  "now-1h",
+                 "to":  "now"
+             },
+    "timepicker":  {
+
+                   },
+    "timezone":  "browser",
+    "title":  "Modu Square - Cache Penetration",
+    "uid":  "modu-square-cache-penetration",
+    "version":  1
+}

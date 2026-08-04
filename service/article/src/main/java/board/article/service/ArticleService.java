@@ -75,7 +75,10 @@ public class ArticleService {
     }
 
     public ArticleResponse read(Long articleId) {
-        return ArticleResponse.from(articleRepository.findById(articleId).orElseThrow());
+        return ArticleResponse.from(
+                articleRepository.findById(articleId)
+                        .orElseThrow(() -> new ArticleNotFoundException(articleId))
+        );
     }
 
     @Transactional

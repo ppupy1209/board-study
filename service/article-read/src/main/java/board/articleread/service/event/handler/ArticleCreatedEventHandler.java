@@ -4,6 +4,7 @@ import board.articleread.repository.ArticleIdListRepository;
 import board.articleread.repository.ArticleQueryModel;
 import board.articleread.repository.ArticleQueryModelRepository;
 import board.articleread.repository.BoardArticleCountRepository;
+import board.articleread.repository.MissingArticleCacheRepository;
 import board.common.event.Event;
 import board.common.event.payload.ArticleCreatedEventPayload;
 import board.common.event.payload.EventType;
@@ -18,10 +19,12 @@ public class ArticleCreatedEventHandler implements EventHandler<ArticleCreatedEv
     private final ArticleIdListRepository articleIdListRepository;
     private final BoardArticleCountRepository boardArticleCountRepository;
     private final ArticleQueryModelRepository articleQueryModelRepository;
+    private final MissingArticleCacheRepository missingArticleCacheRepository;
 
     @Override
     public void handle(Event<ArticleCreatedEventPayload> event) {
         ArticleCreatedEventPayload payload = event.getPayload();
+        missingArticleCacheRepository.delete(payload.getArticleId());
         articleQueryModelRepository.create(
                     ArticleQueryModel.create(payload),
                     Duration.ofDays(1)

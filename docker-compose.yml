@@ -418,6 +418,11 @@ services:
       # VU 상한. 도착률에 비례해 VU를 무한정 늘리면 부하 생성기가 먼저 죽는다.
       # 목표 4,000 RPS 단계에서 VU가 16,000까지 늘어나 로컬 Docker VM이 응답 불능이 된 적이 있어 상한을 둔다.
       MAX_VUS_CAP: ${MAX_VUS_CAP:-}
+      # cache-penetration.js
+      CACHE_PENETRATION_RATE: ${CACHE_PENETRATION_RATE:-}
+      CACHE_PENETRATION_DURATION: ${CACHE_PENETRATION_DURATION:-}
+      MISSING_ARTICLE_ID: ${MISSING_ARTICLE_ID:-}
+      CACHE_PENETRATION_EXPECTED_STATUS: ${CACHE_PENETRATION_EXPECTED_STATUS:-}
       # breakpoint.js
       STAGES: ${STAGES:-}
       STAGE_DURATION: ${STAGE_DURATION:-}

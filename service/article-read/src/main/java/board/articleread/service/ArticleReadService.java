@@ -8,6 +8,7 @@ import board.articleread.repository.ArticleIdListRepository;
 import board.articleread.repository.ArticleQueryModel;
 import board.articleread.repository.ArticleQueryModelRepository;
 import board.articleread.repository.BoardArticleCountRepository;
+import board.articleread.repository.MissingArticleCacheRepository;
 import board.articleread.service.event.handler.EventHandler;
 import board.articleread.service.response.ArticleReadPageResponse;
 import board.articleread.service.response.ArticleReadResponse;
@@ -15,7 +16,9 @@ import board.common.event.Event;
 import board.common.event.EventPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -60,6 +63,9 @@ public class ArticleReadService {
     private final ArticleIdListRepository articleIdListRepository;
     private final BoardArticleCountRepository boardArticleCountRepository;
     private final QueryModelMetrics queryModelMetrics;
+    private final MissingArticleCacheRepository missingArticleCacheRepository;
+    private final ArticleMissingCacheMetrics articleMissingCacheMetrics;
+
     /** 원본 병렬 호출 전용. common ForkJoinPool에 블로킹 호출을 얹지 않기 위해 분리했다. */
     private final ExecutorService articleReadFanoutExecutor;
     private final List<EventHandler> eventHandlers;
@@ -83,37 +89,51 @@ public class ArticleReadService {
             return ArticleReadResponse.from(cached.get(), viewClient.count(articleId));
         }
         queryModelMetrics.miss(1);
-        ArticleQueryModel articleQueryModel = fetch(articleId).orElseThrow();
-        return ArticleReadResponse.from(articleQueryModel, viewClient.count(articleId));
+        if (missingArticleCacheRepository.isMissing(articleId)) {
+            articleMissingCacheMetrics.hit();
+            throw articleNotFound(articleId);
+        }
+
+        Optional<ArticleQueryModel> loaded = fetch(articleId);
+        if (loaded.isEmpty()) {
+            missingArticleCacheRepository.markMissing(articleId);
+            articleMissingCacheMetrics.stored();
+            throw articleNotFound(articleId);
+        }
+        return ArticleReadResponse.from(loaded.get(), viewClient.count(articleId));
     }
 
     /**
      * 조회 모델에 없는 게시글을 원본에서 만들어 온다.
      *
-     * <p>article / comment / like 세 호출은 서로 의존하지 않으므로 병렬로 보낸다.
-     * 순차로 보내면 세 왕복이 더해져 miss 지연이 그대로 3배가 된다.
-     * 호출 <b>횟수</b>는 줄지 않지만 <b>지연</b>은 가장 느린 하나로 수렴한다.
+     * <p>게시글 존재 여부를 먼저 확인한다. 존재하지 않는 ID라면 댓글·좋아요 서비스를 호출하지 않고
+     * 부재 캐시에 기록한다. 게시글이 확인된 뒤에는 서로 독립적인 댓글 수와 좋아요 수를 병렬 조회한다.
      */
     private Optional<ArticleQueryModel> fetch(Long articleId) {
-        CompletableFuture<Optional<ArticleClient.ArticleResponse>> articleFuture =
-                CompletableFuture.supplyAsync(() -> articleClient.read(articleId), articleReadFanoutExecutor);
+        queryModelMetrics.originCall("article", 1);
+        Optional<ArticleClient.ArticleResponse> article = articleClient.read(articleId);
+        if (article.isEmpty()) {
+            return Optional.empty();
+        }
+
         CompletableFuture<Long> commentCountFuture =
                 CompletableFuture.supplyAsync(() -> commentClient.count(articleId), articleReadFanoutExecutor);
         CompletableFuture<Long> likeCountFuture =
                 CompletableFuture.supplyAsync(() -> likeClient.count(articleId), articleReadFanoutExecutor);
-
-        queryModelMetrics.originCall("article", 1);
         queryModelMetrics.originCall("comment", 1);
         queryModelMetrics.originCall("like", 1);
 
-        Optional<ArticleQueryModel> articleQueryModel = articleFuture.join()
-                .map(article -> ArticleQueryModel.create(
-                        article,
-                        commentCountFuture.join(),
-                        likeCountFuture.join()
-                ));
-        articleQueryModel.ifPresent(article -> articleQueryModelRepository.create(article, QUERY_MODEL_TTL));
-        return articleQueryModel;
+        ArticleQueryModel articleQueryModel = ArticleQueryModel.create(
+                article.get(),
+                commentCountFuture.join(),
+                likeCountFuture.join()
+        );
+        articleQueryModelRepository.create(articleQueryModel, QUERY_MODEL_TTL);
+        return Optional.of(articleQueryModel);
+    }
+
+    private ResponseStatusException articleNotFound(Long articleId) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found: " + articleId);
     }
 
     // ────────────────────────────── 목록 조회 ──────────────────────────────
