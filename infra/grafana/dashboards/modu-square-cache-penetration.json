@@ -4,118 +4,139 @@
   "graphTooltip": 1,
   "panels": [
     {
-      "type": "bargauge",
-      "title": "목표 2,000 req/s와 실제 처리율",
-      "description": "같은 존재하지 않는 게시글 ID에 2,000 req/s를 30초간 요청한 변경 전·후 처리율입니다.",
+      "type": "timeseries",
+      "title": "30초간 누적 완료 요청",
+      "description": "같은 삭제 게시글 ID에 2,000 req/s를 보냈을 때 시간에 따라 완료된 요청 수입니다.",
       "id": 1,
       "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "vector(2000)",
-          "legendFormat": "목표 요청률",
-          "refId": "A",
-          "instant": true
+          "expr": "k6_http_reqs_total{testid=\"cache-penetration-saturation-before-20260804\"} offset 785s",
+          "legendFormat": "변경 전",
+          "refId": "A"
         },
         {
-          "expr": "max(last_over_time(k6_http_reqs_total{testid=\"cache-penetration-saturation-before-20260804\"}[2h])) / 30",
-          "legendFormat": "변경 전 실제 처리율",
-          "refId": "B",
-          "instant": true
-        },
-        {
-          "expr": "max(last_over_time(k6_http_reqs_total{testid=\"cache-penetration-saturation-after-lock-20260804\"}[2h])) / 30",
+          "expr": "k6_http_reqs_total{testid=\"cache-penetration-saturation-after-lock-20260804\"}",
           "legendFormat": "잠금·부재 캐시 적용 후",
-          "refId": "C",
-          "instant": true
+          "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "min": 0,
-          "decimals": 0
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
         },
         "overrides": []
       },
       "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
-        "showUnfilled": true
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
     {
-      "type": "bargauge",
-      "title": "변경 전·후 응답 시간",
-      "description": "30초 구간의 p95·p99를 비교합니다.",
+      "type": "timeseries",
+      "title": "응답 시간 변화",
+      "description": "테스트가 진행되는 동안 누적 p95·p99가 어떻게 변했는지 비교합니다.",
       "id": 2,
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 9 },
       "targets": [
         {
-          "expr": "max(last_over_time(k6_http_req_duration_p95{testid=\"cache-penetration-saturation-before-20260804\"}[2h])) * 1000",
+          "expr": "k6_http_req_duration_p95{testid=\"cache-penetration-saturation-before-20260804\"} offset 785s * 1000",
           "legendFormat": "변경 전 p95",
-          "refId": "A",
-          "instant": true
+          "refId": "A"
         },
         {
-          "expr": "max(last_over_time(k6_http_req_duration_p99{testid=\"cache-penetration-saturation-before-20260804\"}[2h])) * 1000",
+          "expr": "k6_http_req_duration_p99{testid=\"cache-penetration-saturation-before-20260804\"} offset 785s * 1000",
           "legendFormat": "변경 전 p99",
-          "refId": "B",
-          "instant": true
+          "refId": "B"
         },
         {
-          "expr": "max(last_over_time(k6_http_req_duration_p95{testid=\"cache-penetration-saturation-after-lock-20260804\"}[2h])) * 1000",
+          "expr": "k6_http_req_duration_p95{testid=\"cache-penetration-saturation-after-lock-20260804\"} * 1000",
           "legendFormat": "적용 후 p95",
-          "refId": "C",
-          "instant": true
+          "refId": "C"
         },
         {
-          "expr": "max(last_over_time(k6_http_req_duration_p99{testid=\"cache-penetration-saturation-after-lock-20260804\"}[2h])) * 1000",
+          "expr": "k6_http_req_duration_p99{testid=\"cache-penetration-saturation-after-lock-20260804\"} * 1000",
           "legendFormat": "적용 후 p99",
-          "refId": "D",
-          "instant": true
+          "refId": "D"
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "ms", "min": 0, "decimals": 2 },
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
         "overrides": []
       },
       "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
-        "showUnfilled": true
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
     {
-      "type": "bargauge",
-      "title": "시작하지 못한 요청",
-      "description": "가상 사용자 상한에 도달해 목표 시각에 시작하지 못한 요청 수입니다.",
+      "type": "timeseries",
+      "title": "누적 미실행 요청",
+      "description": "가상 사용자 상한 때문에 목표 시각에 시작하지 못한 요청이 누적되는 흐름입니다.",
       "id": 3,
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 18 },
       "targets": [
         {
-          "expr": "max(last_over_time(k6_dropped_iterations_total{testid=\"cache-penetration-saturation-before-20260804\"}[2h]))",
+          "expr": "k6_dropped_iterations_total{testid=\"cache-penetration-saturation-before-20260804\"} offset 785s",
           "legendFormat": "변경 전",
-          "refId": "A",
-          "instant": true
+          "refId": "A"
         },
         {
-          "expr": "max(last_over_time(k6_dropped_iterations_total{testid=\"cache-penetration-saturation-after-lock-20260804\"}[2h])) or vector(0)",
-          "legendFormat": "적용 후",
-          "refId": "B",
-          "instant": true
+          "expr": "k6_dropped_iterations_total{testid=\"cache-penetration-saturation-after-lock-20260804\"} or vector(0)",
+          "legendFormat": "잠금·부재 캐시 적용 후",
+          "refId": "B"
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "none", "min": 0, "decimals": 0 },
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
         "overrides": []
       },
       "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
-        "showUnfilled": true
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       }
     }
   ],
@@ -123,10 +144,10 @@
   "schemaVersion": 40,
   "tags": ["modu-square", "cache", "load-test"],
   "templating": { "list": [] },
-  "time": { "from": "now-30m", "to": "now" },
+  "time": { "from": "2026-08-04T04:37:55.000Z", "to": "2026-08-04T04:38:30.000Z" },
   "timepicker": {},
   "timezone": "browser",
   "title": "Modu Square - Cache Saturation",
   "uid": "modu-square-cache-penetration",
-  "version": 2
+  "version": 3
 }
