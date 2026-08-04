@@ -12,6 +12,7 @@ x-service-dependencies: &service-dependencies
     condition: service_healthy
   redis:
     condition: service_healthy
+
   kafka:
     condition: service_started
 
@@ -38,6 +39,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+
+  media-migrate:
+    image: mysql:8.4
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - mysql -hmysql -uroot -proot < /migrations/02-media.sql
+    volumes:
+      - ./infra/mysql/migrations:/migrations:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
 
   seed-large:
     image: mysql:8.4
@@ -68,6 +81,32 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: modu-square
+      MINIO_ROOT_PASSWORD: local-development
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://localhost:${WEB_PORT:-3000}"
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until mc alias set local http://minio:9000 modu-square local-development; do sleep 1; done
+        mc mb --ignore-existing local/modu-square-media
+        mc anonymous set download local/modu-square-media
+    depends_on:
+      - minio
+    restart: "no"
 
   kafka:
     image: apache/kafka:3.8.0
@@ -196,6 +235,33 @@ services:
     depends_on: *service-dependencies
     restart: unless-stopped
 
+  media:
+    build:
+      context: .
+      args: { SERVICE: media }
+    mem_limit: 576m
+    environment:
+      <<: *service-environment
+      DB_URL: jdbc:mysql://mysql:3306/media
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      MEDIA_STORAGE_INTERNAL_ENDPOINT: http://minio:9000
+      MEDIA_STORAGE_PUBLIC_ENDPOINT: http://localhost:9100
+      MEDIA_STORAGE_ACCESS_KEY: modu-square
+      MEDIA_STORAGE_SECRET_KEY: local-development
+      MEDIA_STORAGE_BUCKET: modu-square-media
+    ports: ["9007:9007"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      media-migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   web:
     build: ./web
     environment:
@@ -206,6 +272,7 @@ services:
       NEXT_PUBLIC_VIEW_API_BASE_URL: http://localhost:9003
       NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL: http://localhost:9004
       NEXT_PUBLIC_NOTIFICATION_API_BASE_URL: http://localhost:9006
+      NEXT_PUBLIC_MEDIA_API_BASE_URL: http://localhost:9007
     ports: ["${WEB_PORT:-3000}:3000"]
     depends_on:
       article:
@@ -219,6 +286,8 @@ services:
       hot-article:
         condition: service_started
       notification:
+        condition: service_started
+      media:
         condition: service_started
     restart: unless-stopped
 
@@ -241,6 +310,7 @@ services:
       - hot-article
       - article-read
       - notification
+      - media
 
   mysql-exporter:
     image: prom/mysqld-exporter:v0.15.1
@@ -331,6 +401,7 @@ services:
       HOT_ARTICLE_URL: http://hot-article:9004
       ARTICLE_READ_URL: http://article-read:9005
       NOTIFICATION_URL: http://notification:9006
+      MEDIA_URL: http://media:9007
       TEST_ID: ${TEST_ID:-}
       TEST_TYPE: ${TEST_TYPE:-}
       DATASET: ${DATASET:-15000100}
@@ -370,5 +441,6 @@ volumes:
   mysql-data:
   redis-data:
   kafka-data:
+  minio-data:
   prometheus-data:
   grafana-data:

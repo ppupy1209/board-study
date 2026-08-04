@@ -9,6 +9,8 @@
 - Grafana: `http://localhost:3001` (`admin` / `admin`, 로컬 전용)
 - Prometheus: `http://localhost:9090`
 - Article API: `http://localhost:9000`
+- Media API: `http://localhost:9007`
+- MinIO Console: `http://localhost:9101` (`modu-square` / `local-development`, 로컬 전용)
 
 ## 3분 실행
 
@@ -87,8 +89,9 @@ Grafana의 **모두의 광장 성능·병목 분석** 대시보드에서 `testid
 | 관측성 | Actuator + Prometheus + Grafana + MySQL/Redis/Kafka exporter + k6 remote write | `infra/`, `docker-compose.yml` |
 | 부하 검증 | smoke/average/breakpoint/deep-page/mixed/spike/soak/kafka-recovery 분리 | `load-tests/k6/` |
 | 동시성 정확성 | count 행 원자적 upsert로 deadlock 제거 | `BoardArticleCountRepository`, `ArticleCommentCountRepository`, `ArticleLikeCountRepository` |
+| 이미지 전송 비용 | Presigned URL 직접 업로드 + Kafka 비동기 WebP 변환 | `service:media`, `load-tests/k6/media-upload.js` |
 
-개발 과정의 선택 이유와 한계는 [개발 기록](docs/development-log.md), 대용량 실험 재현 절차는 [성능 테스트 가이드](docs/performance-test.md), 인기글 호출 증폭 개선은 [인기글 조회 부하 테스트](docs/hot-article-load-test.md)에 정리했습니다.
+개발 과정의 선택 이유와 한계는 [개발 기록](docs/development-log.md), 대용량 실험 재현 절차는 [성능 테스트 가이드](docs/performance-test.md), 인기글 호출 증폭 개선은 [인기글 조회 부하 테스트](docs/hot-article-load-test.md), 이미지 첨부와 전송량 개선은 [이미지 전송 비용 최적화](docs/media-image-delivery.md)에 정리했습니다.
 
 ### 실측 요약 (자유게시판 15,000,100건, 로컬 단일 머신)
 

@@ -9,9 +9,11 @@ import {
   ARTICLE_READ_API,
   COMMENT_API,
   LIKE_API,
+  MEDIA_API,
   VIEW_API,
   Article,
   Comment,
+  MediaAsset,
   LOCAL_USER_ID,
   normalizeArticle,
   publishedAt,
@@ -25,6 +27,7 @@ export function ArticleDetailPage() {
   const router = useRouter();
   const articleId = params.articleId;
   const [article, setArticle] = useState<Article | null>(null);
+  const [media, setMedia] = useState<MediaAsset[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentCount, setCommentCount] = useState(0);
   const [likeCount, setLikeCount] = useState(0);
@@ -72,6 +75,30 @@ export function ArticleDetailPage() {
     load();
     return () => { cancelled = true; };
   }, [articleId, loadComments]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+    async function refreshMedia() {
+      try {
+        const items = await requestJson<MediaAsset[]>(`${MEDIA_API}/v1/media/articles/${articleId}`);
+        if (cancelled) return;
+        setMedia(items);
+        if (items.some((item) => item.status === "PENDING" || item.status === "PROCESSING")) {
+          refreshTimer = setTimeout(refreshMedia, 800);
+        }
+      } catch {
+        if (!cancelled) setMedia([]);
+      }
+    }
+
+    refreshMedia();
+    return () => {
+      cancelled = true;
+      if (refreshTimer) clearTimeout(refreshTimer);
+    };
+  }, [articleId]);
 
   async function toggleLike() {
     if (isWorking) return;
@@ -155,6 +182,35 @@ export function ArticleDetailPage() {
               <div className="detail-meta"><span>자유게시판</span><span>modu_{article.writerId}</span><span>·</span><time>{publishedAt(article.createdAt)}</time></div>
               <h1>{article.title}</h1>
               <p className="detail-content">{article.content}</p>
+              {media.length > 0 && (
+                <div className="detail-media-gallery" aria-label="게시글 첨부 이미지">
+                  {media.map((item) => (
+                    <figure key={item.mediaId} data-status={item.status}>
+                      {item.status === "READY" && item.thumbnailUrl ? (
+                        <a href={item.originalUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={item.thumbnailUrl}
+                            alt={item.originalFilename}
+                            width={item.width}
+                            height={item.height}
+                            loading="lazy"
+                          />
+                        </a>
+                      ) : item.status === "FAILED" ? (
+                        <div className="media-processing media-failed">
+                          <strong>이미지를 처리하지 못했습니다.</strong>
+                          <span>잠시 후 다시 시도해 주세요.</span>
+                        </div>
+                      ) : (
+                        <div className="media-processing" role="status">
+                          <span className="media-processing-dot" aria-hidden="true" />
+                          <strong>이미지를 보기 좋게 준비하고 있어요.</strong>
+                        </div>
+                      )}
+                    </figure>
+                  ))}
+                </div>
+              )}
               <div className="detail-actions">
                 <button className={`reaction-button ${liked ? "liked" : ""}`} type="button" onClick={toggleLike} disabled={isWorking} aria-pressed={liked}>
                   <span>{liked ? "♥" : "♡"}</span> 좋아요 {likeCount.toLocaleString("ko-KR")}

@@ -5,6 +5,7 @@ export const LIKE_API = process.env.NEXT_PUBLIC_LIKE_API_BASE_URL ?? "http://loc
 export const VIEW_API = process.env.NEXT_PUBLIC_VIEW_API_BASE_URL ?? "http://localhost:9003";
 export const HOT_ARTICLE_API = process.env.NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL ?? "http://localhost:9004";
 export const NOTIFICATION_API = process.env.NEXT_PUBLIC_NOTIFICATION_API_BASE_URL ?? "http://localhost:9006";
+export const MEDIA_API = process.env.NEXT_PUBLIC_MEDIA_API_BASE_URL ?? "http://localhost:9007";
 
 export const BOARD_ID = "1";
 export const LOCAL_USER_ID = "1";
@@ -39,6 +40,30 @@ export type HotArticle = {
   createdAt?: string;
 };
 
+export type MediaStatus = "PENDING" | "PROCESSING" | "READY" | "FAILED";
+
+export type MediaAsset = {
+  mediaId: string;
+  articleId?: string;
+  originalFilename: string;
+  contentType: string;
+  originalSize: number;
+  thumbnailSize?: number;
+  width?: number;
+  height?: number;
+  status: MediaStatus;
+  uploadMode: "PROXY" | "DIRECT";
+  originalUrl: string;
+  thumbnailUrl?: string;
+  failureReason?: string;
+};
+
+export type UploadTicket = {
+  mediaId: string;
+  uploadUrl: string;
+  headers: Record<string, string>;
+  expiresAt: string;
+};
 export type Notification = {
   notificationId: string;
   articleId: string;

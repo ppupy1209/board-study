@@ -1,0 +1,57 @@
+server:
+  port: 9007
+  shutdown: graceful
+  tomcat:
+    mbeanregistry:
+      enabled: true
+spring:
+  application:
+    name: modu-square-media-service
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3307/media}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+media:
+  storage:
+    internal-endpoint: ${MEDIA_STORAGE_INTERNAL_ENDPOINT:http://127.0.0.1:9100}
+    public-endpoint: ${MEDIA_STORAGE_PUBLIC_ENDPOINT:http://localhost:9100}
+    access-key: ${MEDIA_STORAGE_ACCESS_KEY:modu-square}
+    secret-key: ${MEDIA_STORAGE_SECRET_KEY:local-development}
+    bucket: ${MEDIA_STORAGE_BUCKET:modu-square-media}
+  upload-url-expiry-minutes: 10
+  orphan-cleanup:
+    interval-ms: 3600000
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      service: ${spring.application.name}
