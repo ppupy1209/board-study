@@ -4,6 +4,7 @@ import board.articleread.client.ArticleClient;
 import board.articleread.client.CommentClient;
 import board.articleread.client.LikeClient;
 import board.articleread.client.ViewClient;
+import board.articleread.repository.ArticleLookupLockRepository;
 import board.articleread.repository.ArticleIdListRepository;
 import board.articleread.repository.ArticleQueryModel;
 import board.articleread.repository.ArticleQueryModelRepository;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
@@ -64,6 +66,7 @@ public class ArticleReadService {
     private final BoardArticleCountRepository boardArticleCountRepository;
     private final QueryModelMetrics queryModelMetrics;
     private final MissingArticleCacheRepository missingArticleCacheRepository;
+    private final ArticleLookupLockRepository articleLookupLockRepository;
     private final ArticleMissingCacheMetrics articleMissingCacheMetrics;
 
     /** 원본 병렬 호출 전용. common ForkJoinPool에 블로킹 호출을 얹지 않기 위해 분리했다. */
@@ -71,6 +74,8 @@ public class ArticleReadService {
     private final List<EventHandler> eventHandlers;
 
     private static final Duration QUERY_MODEL_TTL = Duration.ofDays(1);
+    private static final Duration LOOKUP_WAIT_TIMEOUT = Duration.ofSeconds(2);
+    private static final long LOOKUP_POLL_MILLIS = 10;
 
     public void handleEvent(Event<EventPayload> event) {
         for (EventHandler eventHandler : eventHandlers) {
@@ -94,13 +99,65 @@ public class ArticleReadService {
             throw articleNotFound(articleId);
         }
 
-        Optional<ArticleQueryModel> loaded = fetch(articleId);
-        if (loaded.isEmpty()) {
-            missingArticleCacheRepository.markMissing(articleId);
-            articleMissingCacheMetrics.stored();
-            throw articleNotFound(articleId);
+        ArticleQueryModel loaded = loadOnceOrWait(articleId)
+                .orElseThrow(() -> articleNotFound(articleId));
+        return ArticleReadResponse.from(loaded, viewClient.count(articleId));
+    }
+
+    /**
+     * 같은 ID의 콜드 미스가 동시에 들어와도 한 요청만 원본을 확인한다.
+     *
+     * <p>잠금을 잡지 못한 요청은 짧게 대기하며 조회 모델 또는 부재 표시가 만들어지는지 확인한다.
+     * 잠금 소유자의 원본 호출이 실패하면 잘못된 404를 만들지 않고 503으로 종료한다.
+     */
+    private Optional<ArticleQueryModel> loadOnceOrWait(Long articleId) {
+        String lockOwner = UUID.randomUUID().toString();
+        if (!articleLookupLockRepository.tryAcquire(articleId, lockOwner)) {
+            articleMissingCacheMetrics.coalesced();
+            return awaitLookupResult(articleId);
         }
-        return ArticleReadResponse.from(loaded.get(), viewClient.count(articleId));
+
+        try {
+            Optional<ArticleQueryModel> cached = articleQueryModelRepository.read(articleId);
+            if (cached.isPresent()) {
+                return cached;
+            }
+            if (missingArticleCacheRepository.isMissing(articleId)) {
+                articleMissingCacheMetrics.hit();
+                return Optional.empty();
+            }
+
+            Optional<ArticleQueryModel> loaded = fetch(articleId);
+            if (loaded.isEmpty()) {
+                missingArticleCacheRepository.markMissing(articleId);
+                articleMissingCacheMetrics.stored();
+            }
+            return loaded;
+        } finally {
+            articleLookupLockRepository.release(articleId, lockOwner);
+        }
+    }
+
+    private Optional<ArticleQueryModel> awaitLookupResult(Long articleId) {
+        long deadline = System.nanoTime() + LOOKUP_WAIT_TIMEOUT.toNanos();
+        while (System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(LOOKUP_POLL_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw lookupUnavailable(articleId);
+            }
+
+            Optional<ArticleQueryModel> cached = articleQueryModelRepository.read(articleId);
+            if (cached.isPresent()) {
+                return cached;
+            }
+            if (missingArticleCacheRepository.isMissing(articleId)) {
+                articleMissingCacheMetrics.hit();
+                return Optional.empty();
+            }
+        }
+        throw lookupUnavailable(articleId);
     }
 
     /**
@@ -134,6 +191,11 @@ public class ArticleReadService {
 
     private ResponseStatusException articleNotFound(Long articleId) {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found: " + articleId);
+    }
+
+    private ResponseStatusException lookupUnavailable(Long articleId) {
+        return new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE, "Article lookup timed out: " + articleId);
     }
 
     // ────────────────────────────── 목록 조회 ──────────────────────────────

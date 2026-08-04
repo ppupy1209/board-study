@@ -9,6 +9,7 @@ public class ArticleMissingCacheMetrics {
     private static final String EVENTS = "modu.article.missing.cache.events";
     private static final String RESULT_HIT = "hit";
     private static final String RESULT_STORED = "stored";
+    private static final String RESULT_COALESCED = "coalesced";
 
     private final MeterRegistry meterRegistry;
 
@@ -22,6 +23,10 @@ public class ArticleMissingCacheMetrics {
 
     public void stored() {
         record(RESULT_STORED);
+    }
+
+    public void coalesced() {
+        record(RESULT_COALESCED);
     }
 
     private void record(String result) {

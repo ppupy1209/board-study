@@ -5,6 +5,7 @@ import board.articleread.client.CommentClient;
 import board.articleread.client.LikeClient;
 import board.articleread.client.ViewClient;
 import board.articleread.repository.ArticleIdListRepository;
+import board.articleread.repository.ArticleLookupLockRepository;
 import board.articleread.repository.ArticleQueryModelRepository;
 import board.articleread.repository.BoardArticleCountRepository;
 import board.articleread.repository.MissingArticleCacheRepository;
@@ -23,6 +24,8 @@ import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -41,6 +44,7 @@ class ArticleReadServiceMissingArticleTest {
     @Mock private BoardArticleCountRepository boardArticleCountRepository;
     @Mock private QueryModelMetrics queryModelMetrics;
     @Mock private MissingArticleCacheRepository missingArticleCacheRepository;
+    @Mock private ArticleLookupLockRepository articleLookupLockRepository;
     @Mock private ArticleMissingCacheMetrics articleMissingCacheMetrics;
 
     private ExecutorService executor;
@@ -59,6 +63,7 @@ class ArticleReadServiceMissingArticleTest {
                 boardArticleCountRepository,
                 queryModelMetrics,
                 missingArticleCacheRepository,
+                articleLookupLockRepository,
                 articleMissingCacheMetrics,
                 executor,
                 List.of()
@@ -86,6 +91,7 @@ class ArticleReadServiceMissingArticleTest {
     @Test
     void storesMissingMarkerAfterOriginConfirmsNotFound() {
         when(missingArticleCacheRepository.isMissing(ARTICLE_ID)).thenReturn(false);
+        when(articleLookupLockRepository.tryAcquire(eq(ARTICLE_ID), anyString())).thenReturn(true);
         when(articleClient.read(ARTICLE_ID)).thenReturn(Optional.empty());
 
         Throwable thrown = catchThrowable(() -> service.read(ARTICLE_ID));
@@ -94,7 +100,23 @@ class ArticleReadServiceMissingArticleTest {
         assertThat(((ResponseStatusException) thrown).getStatusCode().value()).isEqualTo(404);
         verify(missingArticleCacheRepository).markMissing(ARTICLE_ID);
         verify(articleMissingCacheMetrics).stored();
+        verify(articleLookupLockRepository).release(eq(ARTICLE_ID), anyString());
         verifyNoInteractions(commentClient, likeClient);
+        verify(viewClient, never()).count(ARTICLE_ID);
+    }
+
+    @Test
+    void waitsForTheFirstRequestInsteadOfCallingOriginAgain() {
+        when(missingArticleCacheRepository.isMissing(ARTICLE_ID)).thenReturn(false, true);
+        when(articleLookupLockRepository.tryAcquire(eq(ARTICLE_ID), anyString())).thenReturn(false);
+
+        Throwable thrown = catchThrowable(() -> service.read(ARTICLE_ID));
+
+        assertThat(thrown).isInstanceOf(ResponseStatusException.class);
+        assertThat(((ResponseStatusException) thrown).getStatusCode().value()).isEqualTo(404);
+        verify(articleMissingCacheMetrics).coalesced();
+        verify(articleMissingCacheMetrics).hit();
+        verifyNoInteractions(articleClient, commentClient, likeClient);
         verify(viewClient, never()).count(ARTICLE_ID);
     }
 }
