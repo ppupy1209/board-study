@@ -9,7 +9,7 @@ type HeaderProps = {
   query?: string;
   onQueryChange?: (value: string) => void;
   onSearchSubmit?: (event: FormEvent<HTMLFormElement>) => void;
-  active?: "home";
+  active?: "home" | "popular";
 };
 
 function notificationSummary(notification: NotificationItem) {
@@ -71,7 +71,7 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
       </Link>
       <nav className="main-nav" aria-label="주요 메뉴">
         <Link className={active === "home" ? "active" : undefined} href="/">홈</Link>
-        <Link href="/#popular">인기글</Link>
+        <Link className={active === "popular" ? "active" : undefined} href="/popular">인기글</Link>
         <Link href="/#community">커뮤니티</Link>
       </nav>
       <form className="search" onSubmit={submit} role="search">
@@ -129,7 +129,7 @@ export function CommunityFooter() {
     <footer>
       <span>© 2026 Modu Square</span>
       <span>오늘의 생각이 편안한 대화가 되는 곳</span>
-      <nav><Link href="/#popular">인기글</Link><Link href="/#community">커뮤니티 약속</Link></nav>
+      <nav><Link href="/popular">인기글</Link><Link href="/#community">커뮤니티 약속</Link></nav>
     </footer>
   );
 }

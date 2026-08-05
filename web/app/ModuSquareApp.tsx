@@ -293,6 +293,7 @@ export function ModuSquareApp() {
                   </li>
                 ))}
               </ol>
+              <Link className="popular-more-link" href="/popular">인기글 전체 보기 <span>→</span></Link>
             </section>
 
             <section className="side-card community-card" id="community">

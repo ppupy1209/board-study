@@ -27,16 +27,19 @@ test("server-renders the Modu Square community page", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
 
-test("server-renders writing and article detail routes", async () => {
-  const [writeResponse, detailResponse] = await Promise.all([
+test("server-renders writing, article detail, and popular routes", async () => {
+  const [writeResponse, detailResponse, popularResponse] = await Promise.all([
     render("/write"),
     render("/articles/8000000000000000099"),
+    render("/popular"),
   ]);
 
   assert.equal(writeResponse.status, 200);
   assert.match(await writeResponse.text(), /<title>새 글 쓰기 — Modu Square<\/title>/);
   assert.equal(detailResponse.status, 200);
   assert.match(await detailResponse.text(), /<title>이야기 — Modu Square<\/title>/);
+  assert.equal(popularResponse.status, 200);
+  assert.match(await popularResponse.text(), /<title>인기글 — Modu Square<\/title>/);
 });
 
 test("keeps accessibility, navigation, and social preview contracts", async () => {
@@ -57,6 +60,7 @@ test("keeps accessibility, navigation, and social preview contracts", async () =
   assert.match(page, /href=\{`\/articles\/\$\{article\.articleId\}`\}/);
   assert.match(page, /popularArticles\.map/);
   assert.match(page, /HOT_ARTICLE_API/);
+  assert.match(page, /인기글 전체 보기/);
   assert.match(detail, /aria-pressed=\{liked\}/);
   assert.match(detail, /이야기를 불러오고 있어요/);
   assert.match(write, /<form className="editor-form"/);
