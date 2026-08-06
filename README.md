@@ -54,7 +54,7 @@ TEST_ID=deep-1 docker compose run --rm k6 run -o experimental-prometheus-rw /scr
 TEST_ID=mixed-1 RATE=100 DURATION=5m docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/mixed-workload.js
 
 # 인기글 Top 10 조회의 호출 증폭과 CQRS 조회 모델 비교
-TEST_ID=hot-1 HOT_ARTICLE_DATE=20260731 HOT_RATES=75,100,150,200,250 \
+TEST_ID=hot-1 HOT_RATES=75,100,150,200,250 \
   docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/hot-article-list.js
 
 # 급증 / 장시간 (STABLE_RATE는 breakpoint 실측값을 넣습니다)

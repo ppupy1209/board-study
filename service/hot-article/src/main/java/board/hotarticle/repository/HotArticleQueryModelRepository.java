@@ -14,15 +14,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class HotArticleQueryModelRepository {
     private static final String KEY_FORMAT = "hot-article::article::%s::query-model";
-    private static final Duration TTL = Duration.ofDays(10);
 
     private final StringRedisTemplate redisTemplate;
 
-    public void createOrUpdate(HotArticleQueryModel queryModel) {
+    public void createOrUpdate(HotArticleQueryModel queryModel, Duration ttl) {
         redisTemplate.opsForValue().set(
                 generateKey(queryModel.getArticleId()),
                 DataSerializer.serialize(queryModel),
-                TTL
+                ttl
         );
     }
 

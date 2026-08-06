@@ -20,7 +20,7 @@ return hotArticleListRepository.readAll(dateStr).stream()
 
 ## 개선 방향
 
-인기글 화면에 필요한 `articleId`, `title`, `createdAt`만 Hot Article Service의 Redis 조회 모델로 분리. 게시글 생성·수정 이벤트로 값을 갱신하고 삭제 이벤트로 제거하는 CQRS projection 구성.
+인기글 화면에 필요한 `articleId`, `title`, `createdAt`만 Hot Article Service의 Redis 조회 모델로 분리. 당일 생성 게시글의 생성·수정 이벤트만 반영하고, 삭제 이벤트는 조회 모델과 순위에서 제거하는 CQRS projection 구성.
 
 ```java
 List<Long> articleIds = hotArticleListRepository.readAll(dateStr);
@@ -30,6 +30,7 @@ Map<Long, HotArticleQueryModel> queryModels =
 
 - Redis Sorted Set에서 Top 10 ID 조회
 - `MGET` 한 번으로 10개 조회 모델 일괄 조회
+- 순위와 조회 모델은 다음 날 01시에 함께 만료
 - 이벤트 처리 전이거나 TTL 만료로 누락된 항목만 Article Service에서 보완 조회
 - 보완 조회 결과를 Redis에 다시 저장해 다음 요청부터 조회 모델 사용
 - hit·miss·보완 호출을 별도 Prometheus 지표로 관측
@@ -43,7 +44,7 @@ Map<Long, HotArticleQueryModel> queryModels =
 | 항목 | 설정 |
 |:---:|:---:|
 | 실행 환경 | 로컬 PC · Docker Compose |
-| 인기글 데이터 | 날짜별 Top 10 |
+| 인기글 데이터 | 당일 생성 게시글 Top 10 |
 | Hot Article Service | 1 vCPU · 448MB |
 | Article Service | 1 vCPU · 576MB |
 | MySQL | 2 vCPU · 2GB |
@@ -115,14 +116,13 @@ MySQL QPS는 해당 시간대 서버 전체 값이므로 인기글 요청만의 
 - Kafka 소비 지연 동안 제목 변경이 즉시 반영되지 않는 최종 일관성 수용
 - Redis 조회 모델이 없으면 Article Service 보완 조회로 빈 목록 반환 방지
 - 보완 호출 증가를 별도 지표로 감시해 Consumer 지연이나 TTL 설정 문제 탐지
-- 조회 모델 TTL 10일 적용. 오래된 데이터 자동 정리와 재조회 비용 사이의 절충
+- 당일 생성 게시글만 조회 모델에 저장하고 다음 날 01시에 자동 만료
 - 전체 재구축 도구와 이벤트 순서 역전 방어는 후속 과제
 
 ## 재현
 
 ```bash
 TEST_ID=hot-breakpoint-1 \
-HOT_ARTICLE_DATE=20260731 \
 HOT_WARMUP_RATE=50 \
 HOT_WARMUP_DURATION=30s \
 HOT_RATES=75,100,150,200,250 \

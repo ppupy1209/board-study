@@ -9,10 +9,12 @@ import board.hotarticle.repository.HotArticleQueryModel;
 import board.hotarticle.repository.HotArticleQueryModelRepository;
 import board.hotarticle.service.eventhandler.EventHandler;
 import board.hotarticle.service.response.HotArticleResponse;
+import board.hotarticle.utils.TimeCalculatorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +58,10 @@ public class HotArticleService {
     }
 
     public List<HotArticleResponse> readAll(String dateStr) {
+        if (!TimeCalculatorUtils.isToday(dateStr)) {
+            return List.of();
+        }
+
         List<Long> articleIds = hotArticleListRepository.readAll(dateStr);
         Map<Long, HotArticleQueryModel> queryModels = new LinkedHashMap<>(
                 hotArticleQueryModelRepository.readAll(articleIds)
@@ -67,6 +73,7 @@ public class HotArticleService {
         hotArticleReadModelMetrics.hit(articleIds.size() - missingArticleIds.size());
         hotArticleReadModelMetrics.miss(missingArticleIds.size());
 
+        Duration queryModelTtl = TimeCalculatorUtils.calculateDurationToMidnightWithGrace();
         for (Long articleId : missingArticleIds) {
             hotArticleReadModelMetrics.originCall(1);
             ArticleClient.ArticleResponse article = articleClient.read(articleId);
@@ -74,7 +81,7 @@ public class HotArticleService {
                 continue;
             }
             HotArticleQueryModel queryModel = HotArticleQueryModel.create(article);
-            hotArticleQueryModelRepository.createOrUpdate(queryModel);
+            hotArticleQueryModelRepository.createOrUpdate(queryModel, queryModelTtl);
             queryModels.put(articleId, queryModel);
         }
 

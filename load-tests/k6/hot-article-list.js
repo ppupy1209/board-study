@@ -5,7 +5,7 @@
 // - 변경 전과 조회 모델 적용 후에 동일한 요청률을 사용해 내부 호출 증폭과 응답 지연을 비교한다.
 //
 // 실행 예시:
-// TEST_ID=hot-before-20260731 docker compose run --rm k6 run \
+// TEST_ID=hot-before docker compose run --rm k6 run \
 //   -o experimental-prometheus-rw /scripts/hot-article-list.js
 
 import {
@@ -23,9 +23,11 @@ const RATES = envStr("HOT_RATES", "50,100,200,300")
 const WARMUP_RATE = envNum("HOT_WARMUP_RATE", 10);
 const WARMUP_DURATION = envStr("HOT_WARMUP_DURATION", "30s");
 const STAGE_DURATION = envStr("HOT_STAGE_DURATION", "1m");
+const SEOUL_UTC_OFFSET_MS = 9 * 60 * 60 * 1000;
+const TODAY_IN_SEOUL = new Date(Date.now() + SEOUL_UTC_OFFSET_MS);
 const ARTICLE_DATE = envStr(
   "HOT_ARTICLE_DATE",
-  new Date().toISOString().slice(0, 10).replaceAll("-", "")
+  TODAY_IN_SEOUL.toISOString().slice(0, 10).replaceAll("-", "")
 );
 
 function parseDuration(value) {

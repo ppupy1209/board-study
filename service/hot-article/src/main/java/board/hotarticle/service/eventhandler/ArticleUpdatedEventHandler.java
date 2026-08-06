@@ -5,6 +5,7 @@ import board.common.event.payload.ArticleUpdatedEventPayload;
 import board.common.event.payload.EventType;
 import board.hotarticle.repository.HotArticleQueryModel;
 import board.hotarticle.repository.HotArticleQueryModelRepository;
+import board.hotarticle.utils.TimeCalculatorUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +16,14 @@ public class ArticleUpdatedEventHandler implements EventHandler<ArticleUpdatedEv
 
     @Override
     public void handle(Event<ArticleUpdatedEventPayload> event) {
-        hotArticleQueryModelRepository.createOrUpdate(HotArticleQueryModel.create(event.getPayload()));
+        ArticleUpdatedEventPayload payload = event.getPayload();
+        if (!TimeCalculatorUtils.isToday(payload.getCreatedAt())) {
+            return;
+        }
+        hotArticleQueryModelRepository.createOrUpdate(
+                HotArticleQueryModel.create(payload),
+                TimeCalculatorUtils.calculateDurationToMidnightWithGrace()
+        );
     }
 
     @Override

@@ -15,6 +15,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -117,7 +121,7 @@ class HotArticleServiceTest {
 
     @Test
     void readAllUsesQueryModelsWithoutArticleServiceCalls() {
-        String date = "20260731";
+        String date = today();
         HotArticleQueryModel first = mock(HotArticleQueryModel.class);
         HotArticleQueryModel second = mock(HotArticleQueryModel.class);
         given(first.getArticleId()).willReturn(1L);
@@ -134,11 +138,20 @@ class HotArticleServiceTest {
     }
 
     @Test
+    void readAllReturnsEmptyForPastDate() {
+        List<HotArticleResponse> responses = hotArticleService.readAll(date(-1));
+
+        assertThat(responses).isEmpty();
+        verifyNoInteractions(hotArticleListRepository, hotArticleQueryModelRepository, articleClient);
+    }
+
+    @Test
     void readAllFillsMissingQueryModelFromArticleServiceOnce() {
-        String date = "20260731";
+        String date = today();
         ArticleClient.ArticleResponse article = mock(ArticleClient.ArticleResponse.class);
         given(article.getArticleId()).willReturn(1L);
         given(article.getTitle()).willReturn("title");
+        given(article.getCreatedAt()).willReturn(LocalDate.now(ZoneId.of("Asia/Seoul")).atStartOfDay());
         given(hotArticleListRepository.readAll(date)).willReturn(List.of(1L));
         given(hotArticleQueryModelRepository.readAll(List.of(1L))).willReturn(Map.of());
         given(articleClient.read(1L)).willReturn(article);
@@ -148,6 +161,17 @@ class HotArticleServiceTest {
         assertThat(responses).extracting(HotArticleResponse::getArticleId).containsExactly(1L);
         verify(hotArticleReadModelMetrics).miss(1);
         verify(hotArticleReadModelMetrics).originCall(1);
-        verify(hotArticleQueryModelRepository).createOrUpdate(any(HotArticleQueryModel.class));
+        verify(hotArticleQueryModelRepository).createOrUpdate(
+                any(HotArticleQueryModel.class), any(Duration.class)
+        );
+    }
+
+    private String today() {
+        return date(0);
+    }
+
+    private String date(int daysToAdd) {
+        return LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(daysToAdd)
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd"));
     }
 }

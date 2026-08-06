@@ -100,7 +100,7 @@ JOIN article a ON a.article_id = page.article_id;
 
 ### 결정
 
-Kafka로 변경 이벤트를 모으고 인기글 서비스가 가중 점수를 계산해 Redis Sorted Set에 저장합니다. 날짜를 키에 포함해 오늘의 Top 10을 `ZREVRANGE`로 바로 조회합니다.
+Kafka로 변경 이벤트를 모으고 인기글 서비스가 가중 점수를 계산해 Redis Sorted Set에 저장합니다. 당일 생성 게시글만 집계해 오늘의 Top 10을 `ZREVRANGE`로 조회하고, 순위와 화면 표시용 조회 모델은 다음 날 01시에 만료합니다.
 
 ### 트레이드오프
 
