@@ -19,10 +19,12 @@ class TimeCalculatorUtilsTest {
     }
 
     @Test
-    void expiresAfterTheLastPreviousDayDisplayMinute() {
+    void expiresTodayArticleAtNextDayZeroSix() {
         LocalDateTime now = LocalDateTime.of(2026, 8, 6, 15, 30);
 
-        Duration duration = TimeCalculatorUtils.calculateDurationToMidnightWithGrace(now);
+        Duration duration = TimeCalculatorUtils.calculateDurationToExpiration(
+                LocalDate.of(2026, 8, 6), now
+        );
 
         assertThat(duration).isEqualTo(Duration.ofHours(8).plusMinutes(36));
     }
@@ -38,19 +40,29 @@ class TimeCalculatorUtilsTest {
     }
 
     @Test
-    void identifiesTodayByCreationTime() {
-        LocalDate today = LocalDate.of(2026, 8, 6);
+    void keepsYesterdayAndTodayActiveUntilZeroFive() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 6, 0, 5, 59);
 
-        assertThat(TimeCalculatorUtils.isToday(today.atTime(23, 59), today)).isTrue();
-        assertThat(TimeCalculatorUtils.isToday(today.minusDays(1).atTime(23, 59), today)).isFalse();
-        assertThat(TimeCalculatorUtils.isToday((LocalDateTime) null, today)).isFalse();
+        assertThat(TimeCalculatorUtils.isActiveHotArticleDate(
+                LocalDateTime.of(2026, 8, 5, 12, 0), now
+        )).isTrue();
+        assertThat(TimeCalculatorUtils.isActiveHotArticleDate(
+                LocalDateTime.of(2026, 8, 6, 0, 1), now
+        )).isTrue();
+        assertThat(TimeCalculatorUtils.isActiveHotArticleDate(
+                LocalDateTime.of(2026, 8, 4, 12, 0), now
+        )).isFalse();
     }
 
     @Test
-    void identifiesTodayByDateString() {
-        LocalDate today = LocalDate.of(2026, 8, 6);
+    void expiresYesterdayArticleAtZeroSix() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 6, 0, 4);
 
-        assertThat(TimeCalculatorUtils.isToday("20260806", today)).isTrue();
-        assertThat(TimeCalculatorUtils.isToday("20260805", today)).isFalse();
+        assertThat(TimeCalculatorUtils.calculateDurationToExpiration(
+                LocalDate.of(2026, 8, 5), now
+        )).isEqualTo(Duration.ofMinutes(2));
+        assertThat(TimeCalculatorUtils.isActiveHotArticleDate(
+                LocalDateTime.of(2026, 8, 5, 12, 0), LocalDateTime.of(2026, 8, 6, 0, 6)
+        )).isFalse();
     }
 }

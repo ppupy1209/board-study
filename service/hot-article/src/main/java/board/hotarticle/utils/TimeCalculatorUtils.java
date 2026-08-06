@@ -9,8 +9,6 @@ import java.time.format.DateTimeFormatter;
 
 public class TimeCalculatorUtils {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
-    // 00:05:59까지 전날 인기글을 제공하므로 00:06:00에 만료한다.
-    private static final Duration EXPIRATION_GRACE = Duration.ofMinutes(6);
     private static final LocalTime TODAY_RANKING_START = LocalTime.of(0, 6);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -19,12 +17,20 @@ public class TimeCalculatorUtils {
         return calculateDurationToMidnight(now);
     }
 
-    public static Duration calculateDurationToMidnightWithGrace() {
-        return calculateDurationToMidnightWithGrace(LocalDateTime.now(BUSINESS_ZONE));
+    public static Duration calculateDurationToExpiration(LocalDateTime createdAt) {
+        return calculateDurationToExpiration(createdAt.toLocalDate(), LocalDateTime.now(BUSINESS_ZONE));
     }
 
-    static Duration calculateDurationToMidnightWithGrace(LocalDateTime now) {
-        return calculateDurationToMidnight(now).plus(EXPIRATION_GRACE);
+    public static Duration calculateDurationToExpiration(String dateStr) {
+        return calculateDurationToExpiration(
+                LocalDate.parse(dateStr, DATE_FORMATTER),
+                LocalDateTime.now(BUSINESS_ZONE)
+        );
+    }
+
+    static Duration calculateDurationToExpiration(LocalDate articleDate, LocalDateTime now) {
+        LocalDateTime expiresAt = articleDate.plusDays(1).atTime(TODAY_RANKING_START);
+        return Duration.between(now, expiresAt);
     }
 
     static Duration calculateDurationToMidnight(LocalDateTime now) {
@@ -43,19 +49,17 @@ public class TimeCalculatorUtils {
         return DATE_FORMATTER.format(hotArticleDate);
     }
 
-    public static boolean isToday(LocalDateTime dateTime) {
-        return isToday(dateTime, LocalDate.now(BUSINESS_ZONE));
+    public static boolean isActiveHotArticleDate(LocalDateTime createdAt) {
+        return isActiveHotArticleDate(createdAt, LocalDateTime.now(BUSINESS_ZONE));
     }
 
-    static boolean isToday(LocalDateTime dateTime, LocalDate today) {
-        return dateTime != null && dateTime.toLocalDate().equals(today);
-    }
-
-    public static boolean isToday(String dateStr) {
-        return isToday(dateStr, LocalDate.now(BUSINESS_ZONE));
-    }
-
-    static boolean isToday(String dateStr, LocalDate today) {
-        return DATE_FORMATTER.format(today).equals(dateStr);
+    static boolean isActiveHotArticleDate(LocalDateTime createdAt, LocalDateTime now) {
+        if (createdAt == null) {
+            return false;
+        }
+        LocalDate createdDate = createdAt.toLocalDate();
+        return createdDate.equals(now.toLocalDate())
+                || (now.toLocalTime().isBefore(TODAY_RANKING_START)
+                && createdDate.equals(now.toLocalDate().minusDays(1)));
     }
 }

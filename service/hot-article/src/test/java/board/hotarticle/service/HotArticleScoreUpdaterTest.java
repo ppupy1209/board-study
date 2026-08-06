@@ -32,19 +32,19 @@ class HotArticleScoreUpdaterTest {
     ArticleCreatedTimeRepository articleCreatedTimeRepository;
 
     @Test
-    void updateIfArticleNotCreatedTodayTest() {
+    void ignoresInactiveArticle() {
         Long articleId = 1L;
         Event event = mock(Event.class);
         EventHandler eventHandler = mock(EventHandler.class);
 
         given(eventHandler.findArticleId(event)).willReturn(articleId);
 
-        LocalDateTime createdTime = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(1);
+        LocalDateTime createdTime = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(2);
         given(articleCreatedTimeRepository.read(articleId)).willReturn(createdTime);
 
         hotArticleScoreUpdater.update(event, eventHandler);
 
-        verify(eventHandler, never()).handle(event);
+        verify(eventHandler, never()).handle(eq(event), any(Duration.class));
         verify(hotArticleListRepository, never())
                 .add(anyLong(), any(LocalDateTime.class), anyLong(), anyLong(), any(Duration.class));
     }
@@ -62,7 +62,8 @@ class HotArticleScoreUpdaterTest {
 
         hotArticleScoreUpdater.update(event, eventHandler);
 
-        verify(eventHandler).handle(event);
+        ArgumentCaptor<Duration> handlerTtlCaptor = ArgumentCaptor.forClass(Duration.class);
+        verify(eventHandler).handle(eq(event), handlerTtlCaptor.capture());
         ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
         verify(hotArticleListRepository).add(
                 anyLong(), any(LocalDateTime.class), anyLong(), anyLong(), ttlCaptor.capture()
@@ -70,5 +71,6 @@ class HotArticleScoreUpdaterTest {
         Duration ttl = ttlCaptor.getValue();
         assertTrue(!ttl.isNegative() && !ttl.isZero());
         assertTrue(ttl.compareTo(Duration.ofHours(25)) <= 0);
+        assertEquals(handlerTtlCaptor.getValue(), ttl);
     }
 }

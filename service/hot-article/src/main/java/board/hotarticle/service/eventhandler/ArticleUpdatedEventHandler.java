@@ -17,12 +17,12 @@ public class ArticleUpdatedEventHandler implements EventHandler<ArticleUpdatedEv
     @Override
     public void handle(Event<ArticleUpdatedEventPayload> event) {
         ArticleUpdatedEventPayload payload = event.getPayload();
-        if (!TimeCalculatorUtils.isToday(payload.getCreatedAt())) {
+        if (!TimeCalculatorUtils.isActiveHotArticleDate(payload.getCreatedAt())) {
             return;
         }
         hotArticleQueryModelRepository.createOrUpdate(
                 HotArticleQueryModel.create(payload),
-                TimeCalculatorUtils.calculateDurationToMidnightWithGrace()
+                TimeCalculatorUtils.calculateDurationToExpiration(payload.getCreatedAt())
         );
     }
 

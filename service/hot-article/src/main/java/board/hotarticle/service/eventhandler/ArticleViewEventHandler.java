@@ -8,6 +8,8 @@ import board.hotarticle.utils.TimeCalculatorUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 @Component
 @RequiredArgsConstructor
 public class ArticleViewEventHandler implements EventHandler<ArticleViewedEventPayload>{
@@ -15,11 +17,16 @@ public class ArticleViewEventHandler implements EventHandler<ArticleViewedEventP
 
     @Override
     public void handle(Event<ArticleViewedEventPayload> event) {
+        handle(event, TimeCalculatorUtils.calculateDurationToMidnight());
+    }
+
+    @Override
+    public void handle(Event<ArticleViewedEventPayload> event, Duration ttl) {
         ArticleViewedEventPayload payload = event.getPayload();
         articleViewCountRepository.createOrUpdate(
                 payload.getArticleId(),
                 payload.getArticleViewCount(),
-                TimeCalculatorUtils.calculateDurationToMidnight()
+                ttl
         );
     }
 

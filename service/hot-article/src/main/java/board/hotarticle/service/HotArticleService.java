@@ -73,7 +73,7 @@ public class HotArticleService {
         hotArticleReadModelMetrics.hit(articleIds.size() - missingArticleIds.size());
         hotArticleReadModelMetrics.miss(missingArticleIds.size());
 
-        Duration queryModelTtl = TimeCalculatorUtils.calculateDurationToMidnightWithGrace();
+        Duration queryModelTtl = TimeCalculatorUtils.calculateDurationToExpiration(dateStr);
         for (Long articleId : missingArticleIds) {
             hotArticleReadModelMetrics.originCall(1);
             ArticleClient.ArticleResponse article = articleClient.read(articleId);

@@ -28,7 +28,7 @@ class ArticleUpdatedEventHandlerTest {
     HotArticleQueryModelRepository hotArticleQueryModelRepository;
 
     @Test
-    void updatesTodayArticleUntilMidnightWithGrace() {
+    void updatesActiveArticleUntilExpiration() {
         Event<ArticleUpdatedEventPayload> event = mock(Event.class);
         ArticleUpdatedEventPayload payload = mock(ArticleUpdatedEventPayload.class);
         given(event.getPayload()).willReturn(payload);
@@ -42,11 +42,11 @@ class ArticleUpdatedEventHandlerTest {
     }
 
     @Test
-    void ignoresArticleCreatedBeforeToday() {
+    void ignoresInactiveArticle() {
         Event<ArticleUpdatedEventPayload> event = mock(Event.class);
         ArticleUpdatedEventPayload payload = mock(ArticleUpdatedEventPayload.class);
         given(event.getPayload()).willReturn(payload);
-        given(payload.getCreatedAt()).willReturn(LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(1));
+        given(payload.getCreatedAt()).willReturn(LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(2));
 
         handler.handle(event);
 

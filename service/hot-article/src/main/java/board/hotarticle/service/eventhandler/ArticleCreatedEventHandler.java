@@ -21,11 +21,11 @@ public class ArticleCreatedEventHandler implements EventHandler<ArticleCreatedEv
     @Override
     public void handle(Event<ArticleCreatedEventPayload> event) {
         ArticleCreatedEventPayload payload = event.getPayload();
-        if (!TimeCalculatorUtils.isToday(payload.getCreatedAt())) {
+        if (!TimeCalculatorUtils.isActiveHotArticleDate(payload.getCreatedAt())) {
             return;
         }
 
-        Duration ttl = TimeCalculatorUtils.calculateDurationToMidnightWithGrace();
+        Duration ttl = TimeCalculatorUtils.calculateDurationToExpiration(payload.getCreatedAt());
         articleCreatedTimeRepository.createOrUpdate(
                 payload.getArticleId(),
                 payload.getCreatedAt(),

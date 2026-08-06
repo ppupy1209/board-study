@@ -9,6 +9,7 @@ import board.hotarticle.utils.TimeCalculatorUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Component
@@ -24,11 +25,12 @@ public class HotArticleScoreUpdater {
         Long articleId = eventHandler.findArticleId(event);
         LocalDateTime createdTime = articleCreatedTimeRepository.read(articleId);
 
-        if (!isArticleCreatedToday(createdTime)) {
+        if (!TimeCalculatorUtils.isActiveHotArticleDate(createdTime)) {
             return;
         }
 
-        eventHandler.handle(event);
+        Duration ttl = TimeCalculatorUtils.calculateDurationToExpiration(createdTime);
+        eventHandler.handle(event, ttl);
 
         long score = hotArticleScoreCalculator.calculate(articleId);
         hotArticleListRepository.add(
@@ -36,12 +38,7 @@ public class HotArticleScoreUpdater {
                 createdTime,
                 score,
                 HOT_ARTICLE_COUNT,
-                TimeCalculatorUtils.calculateDurationToMidnightWithGrace()
+                ttl
         );
     }
-
-    private boolean isArticleCreatedToday(LocalDateTime createdTime) {
-        return TimeCalculatorUtils.isToday(createdTime);
-    }
-
 }

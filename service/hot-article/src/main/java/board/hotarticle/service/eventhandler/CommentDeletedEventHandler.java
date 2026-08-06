@@ -8,6 +8,8 @@ import board.hotarticle.utils.TimeCalculatorUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 @Component
 @RequiredArgsConstructor
 public class CommentDeletedEventHandler implements EventHandler<CommentDeletedEventPayload>{
@@ -15,11 +17,16 @@ public class CommentDeletedEventHandler implements EventHandler<CommentDeletedEv
 
     @Override
     public void handle(Event<CommentDeletedEventPayload> event) {
+        handle(event, TimeCalculatorUtils.calculateDurationToMidnight());
+    }
+
+    @Override
+    public void handle(Event<CommentDeletedEventPayload> event, Duration ttl) {
         CommentDeletedEventPayload payload = event.getPayload();
         articleCommentCountRepository.createOrUpdate(
                 payload.getArticleId(),
                 payload.getArticleCommentCount(),
-                TimeCalculatorUtils.calculateDurationToMidnight()
+                ttl
         );
     }
 

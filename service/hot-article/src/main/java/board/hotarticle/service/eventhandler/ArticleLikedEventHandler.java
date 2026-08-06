@@ -8,6 +8,8 @@ import board.hotarticle.utils.TimeCalculatorUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 @Component
 @RequiredArgsConstructor
 public class ArticleLikedEventHandler implements EventHandler<ArticleLikedEventPayload>{
@@ -15,11 +17,16 @@ public class ArticleLikedEventHandler implements EventHandler<ArticleLikedEventP
 
     @Override
     public void handle(Event<ArticleLikedEventPayload> event) {
+        handle(event, TimeCalculatorUtils.calculateDurationToMidnight());
+    }
+
+    @Override
+    public void handle(Event<ArticleLikedEventPayload> event, Duration ttl) {
         ArticleLikedEventPayload payload = event.getPayload();
         articleLikeCountRepository.createOrUpdate(
                 payload.getArticleId(),
                 payload.getArticleLikeCount(),
-                TimeCalculatorUtils.calculateDurationToMidnight()
+                ttl
         );
     }
 
