@@ -6,9 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -31,10 +28,8 @@ public class HotArticleApiTest {
 
     @Test
     void readAllTest() {
-        String today = LocalDate.now(ZoneId.of("Asia/Seoul"))
-                .format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         List<HotArticleResponse> responses = restClient.get()
-                .uri("/v1/hot-articles/articles/date/{dateStr}", today)
+                .uri("/v1/hot-articles/articles")
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<HotArticleResponse>>() {
                 });

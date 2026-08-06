@@ -132,13 +132,7 @@ export function ModuSquareApp() {
       })
       .catch(() => undefined);
 
-    const today = new Intl.DateTimeFormat("en-CA", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      timeZone: "Asia/Seoul",
-    }).format(new Date()).replaceAll("-", "");
-    fetch(`${HOT_ARTICLE_API}/v1/hot-articles/articles/date/${today}`, { signal: controller.signal })
+    fetch(`${HOT_ARTICLE_API}/v1/hot-articles/articles`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error("hot article api unavailable");
         return response.json();

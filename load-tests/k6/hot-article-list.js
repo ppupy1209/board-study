@@ -23,13 +23,6 @@ const RATES = envStr("HOT_RATES", "50,100,200,300")
 const WARMUP_RATE = envNum("HOT_WARMUP_RATE", 10);
 const WARMUP_DURATION = envStr("HOT_WARMUP_DURATION", "30s");
 const STAGE_DURATION = envStr("HOT_STAGE_DURATION", "1m");
-const SEOUL_UTC_OFFSET_MS = 9 * 60 * 60 * 1000;
-const TODAY_IN_SEOUL = new Date(Date.now() + SEOUL_UTC_OFFSET_MS);
-const ARTICLE_DATE = envStr(
-  "HOT_ARTICLE_DATE",
-  TODAY_IN_SEOUL.toISOString().slice(0, 10).replaceAll("-", "")
-);
-
 function parseDuration(value) {
   const match = /^(\d+)(s|m)$/.exec(value);
   if (!match) return 60;
@@ -81,10 +74,10 @@ export const options = {
 
 export function readHotArticles() {
   const response = get(
-    `${urls.hotArticle}/v1/hot-articles/articles/date/${ARTICLE_DATE}`,
+    `${urls.hotArticle}/v1/hot-articles/articles`,
     {
       name: "hot_article_list",
-      endpoint: "GET /v1/hot-articles/articles/date/{dateStr}",
+      endpoint: "GET /v1/hot-articles/articles",
       workload: TEST_TYPE,
     }
   );

@@ -57,11 +57,11 @@ public class HotArticleService {
                 .orElse(null);
     }
 
-    public List<HotArticleResponse> readAll(String dateStr) {
-        if (!TimeCalculatorUtils.isToday(dateStr)) {
-            return List.of();
-        }
+    public List<HotArticleResponse> readAll() {
+        return readAll(TimeCalculatorUtils.calculateHotArticleDate());
+    }
 
+    List<HotArticleResponse> readAll(String dateStr) {
         List<Long> articleIds = hotArticleListRepository.readAll(dateStr);
         Map<Long, HotArticleQueryModel> queryModels = new LinkedHashMap<>(
                 hotArticleQueryModelRepository.readAll(articleIds)

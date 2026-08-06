@@ -9,7 +9,9 @@ import java.time.format.DateTimeFormatter;
 
 public class TimeCalculatorUtils {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
-    private static final Duration EXPIRATION_GRACE = Duration.ofHours(1);
+    // 00:05:59까지 전날 인기글을 제공하므로 00:06:00에 만료한다.
+    private static final Duration EXPIRATION_GRACE = Duration.ofMinutes(6);
+    private static final LocalTime TODAY_RANKING_START = LocalTime.of(0, 6);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     public static Duration calculateDurationToMidnight() {
@@ -28,6 +30,17 @@ public class TimeCalculatorUtils {
     static Duration calculateDurationToMidnight(LocalDateTime now) {
         LocalDateTime midnight = now.plusDays(1).with(LocalTime.MIDNIGHT);
         return Duration.between(now, midnight);
+    }
+
+    public static String calculateHotArticleDate() {
+        return calculateHotArticleDate(LocalDateTime.now(BUSINESS_ZONE));
+    }
+
+    static String calculateHotArticleDate(LocalDateTime now) {
+        LocalDate hotArticleDate = now.toLocalTime().isBefore(TODAY_RANKING_START)
+                ? now.toLocalDate().minusDays(1)
+                : now.toLocalDate();
+        return DATE_FORMATTER.format(hotArticleDate);
     }
 
     public static boolean isToday(LocalDateTime dateTime) {

@@ -19,12 +19,22 @@ class TimeCalculatorUtilsTest {
     }
 
     @Test
-    void addsOneHourExpirationGrace() {
+    void expiresAfterTheLastPreviousDayDisplayMinute() {
         LocalDateTime now = LocalDateTime.of(2026, 8, 6, 15, 30);
 
         Duration duration = TimeCalculatorUtils.calculateDurationToMidnightWithGrace(now);
 
-        assertThat(duration).isEqualTo(Duration.ofHours(9).plusMinutes(30));
+        assertThat(duration).isEqualTo(Duration.ofHours(8).plusMinutes(36));
+    }
+
+    @Test
+    void usesYesterdayUntilZeroFiveAndTodayFromZeroSix() {
+        assertThat(TimeCalculatorUtils.calculateHotArticleDate(
+                LocalDateTime.of(2026, 8, 6, 0, 5, 59)
+        )).isEqualTo("20260805");
+        assertThat(TimeCalculatorUtils.calculateHotArticleDate(
+                LocalDateTime.of(2026, 8, 6, 0, 6)
+        )).isEqualTo("20260806");
     }
 
     @Test

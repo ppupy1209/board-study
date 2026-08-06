@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -121,7 +120,7 @@ class HotArticleServiceTest {
 
     @Test
     void readAllUsesQueryModelsWithoutArticleServiceCalls() {
-        String date = today();
+        String date = displayDate();
         HotArticleQueryModel first = mock(HotArticleQueryModel.class);
         HotArticleQueryModel second = mock(HotArticleQueryModel.class);
         given(first.getArticleId()).willReturn(1L);
@@ -138,16 +137,8 @@ class HotArticleServiceTest {
     }
 
     @Test
-    void readAllReturnsEmptyForPastDate() {
-        List<HotArticleResponse> responses = hotArticleService.readAll(date(-1));
-
-        assertThat(responses).isEmpty();
-        verifyNoInteractions(hotArticleListRepository, hotArticleQueryModelRepository, articleClient);
-    }
-
-    @Test
     void readAllFillsMissingQueryModelFromArticleServiceOnce() {
-        String date = today();
+        String date = displayDate();
         ArticleClient.ArticleResponse article = mock(ArticleClient.ArticleResponse.class);
         given(article.getArticleId()).willReturn(1L);
         given(article.getTitle()).willReturn("title");
@@ -166,12 +157,7 @@ class HotArticleServiceTest {
         );
     }
 
-    private String today() {
-        return date(0);
-    }
-
-    private String date(int daysToAdd) {
-        return LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(daysToAdd)
-                .format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+    private String displayDate() {
+        return board.hotarticle.utils.TimeCalculatorUtils.calculateHotArticleDate();
     }
 }
