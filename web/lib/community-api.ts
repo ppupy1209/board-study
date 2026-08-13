@@ -6,6 +6,7 @@ export const VIEW_API = process.env.NEXT_PUBLIC_VIEW_API_BASE_URL ?? "http://loc
 export const HOT_ARTICLE_API = process.env.NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL ?? "http://localhost:9004";
 export const NOTIFICATION_API = process.env.NEXT_PUBLIC_NOTIFICATION_API_BASE_URL ?? "http://localhost:9006";
 export const MEDIA_API = process.env.NEXT_PUBLIC_MEDIA_API_BASE_URL ?? "http://localhost:9007";
+export const SEARCH_API = process.env.NEXT_PUBLIC_SEARCH_API_BASE_URL ?? "http://localhost:9008";
 
 export const BOARD_ID = "1";
 export const LOCAL_USER_ID = "1";

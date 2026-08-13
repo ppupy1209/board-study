@@ -1,0 +1,63 @@
+---
+title: "1,500만 건 LIKE 검색을 Elasticsearch + Nori로 분리"
+slug: modu-square-search-elasticsearch-nori
+project: modu-square
+order: 9
+date: 2026-08-13
+summary: 선행 와일드카드 병목을 재현하고 Kafka 동기화·체크포인트 재구축을 갖춘 한국어 검색 조회 모델로 개선
+---
+
+# 1,500만 건 LIKE 검색을 Elasticsearch + Nori로 분리
+
+## 문제
+
+`title LIKE '%검색어%' OR content LIKE '%검색어%'`는 검색어 앞의 `%` 때문에 일반 B-Tree 인덱스로 문자열 시작점을 찾을 수 없다. 결과가 없거나 오래된 글에 있으면 1,500만 건의 제목과 본문을 끝까지 검사하고, 그 비용이 게시글 목록과 쓰기가 사용하는 MySQL에 그대로 전가된다.
+
+LIKE API는 이 문제를 같은 데이터에서 측정하는 기준선으로만 남기고, 실제 UI 검색은 Elasticsearch + Nori로 전환했다.
+
+## 왜 Elasticsearch + Nori인가
+
+- 한국어 형태소와 복합어를 분석하고 제목에 2배 가중치를 줄 수 있다.
+- 검색 부하와 원본 게시글 DB의 트랜잭션 부하를 분리한다.
+- 사용자 사전, 동의어, 오타 허용, 자동완성 같은 검색 품질 기능으로 확장할 수 있다.
+
+~~~text
+Article Service
+  └─ 같은 트랜잭션에 Outbox 저장
+       └─ Kafka board-article
+            └─ Search Service
+                 ├─ articleId 기준 upsert/delete
+                 └─ Elasticsearch + Nori
+~~~
+
+## 1,500만 건 재구축
+
+- Article Service의 keyset API를 5,000건씩 읽어 Bulk API로 적재
+- 배치마다 `lastArticleId`, `indexedCount`를 meta index에 저장
+- 재구축 중 refresh 비활성화, 완료 후 5초로 복구하고 명시적 refresh
+- 문서 ID를 `articleId`로 고정해 중복 이벤트에도 같은 최종 상태 유지
+
+<!-- portfolio-reindex-results -->
+
+## 문서 수만 맞아도 실패할 수 있었다
+
+첫 구현에서는 15,000,112건이 모두 들어갔지만 적중 검색이 0건이었다. Bulk NDJSON charset을 생략해 한국어가 `?`로 저장된 것이 원인이었다.
+
+~~~java
+.contentType(MediaType.parseMediaType(
+    "application/x-ndjson;charset=UTF-8"
+))
+~~~
+
+- Bulk 본문의 한국어 보존 회귀 테스트 추가
+- 완료 조건을 문서 수에서 원문·적중 4개·부재 2개 검증까지 확장
+
+## LIKE와 동일 조건 검증
+
+15,000,112건에서 저빈도 적중어 4개와 부재어 2개를 동일 순서로 요청했다. LIKE 경로가 지나치게 느려 동시 전체 스캔 실험으로 변질되지 않도록 두 경로 모두 30초당 1회, 6분간 실행했다.
+
+<!-- portfolio-elasticsearch-k6-results -->
+
+## 결론
+
+Elasticsearch + Nori는 단순히 느린 SQL을 빠른 API로 교체하는 작업이 아니었다. Kafka 소비 지연, refresh 지연, 전체 재구축, 체크포인트, 재구축 중 이벤트 경쟁까지 검색 기능의 일부로 운영해야 한다. 그 비용을 감수하는 대신 한국어 검색 품질을 확장할 기반과 원본 DB의 검색 부하 격리를 얻었다.
