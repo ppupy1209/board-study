@@ -2,10 +2,10 @@ package board.hotarticle.config;
 
 import board.common.event.EventConsumeMetrics;
 import board.hotarticle.kafka.HotArticleDlqMetrics;
-import board.hotarticle.kafka.HotArticleKafkaFailureHandler;
 import board.hotarticle.kafka.HotArticleKafkaTopics;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.TopicPartition;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,9 +14,12 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.listener.RetryListener;
 import org.springframework.util.backoff.FixedBackOff;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -48,12 +51,42 @@ public class KafkaConfig {
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
         factory.getContainerProperties().setDeliveryAttemptHeader(true);
 
-        DefaultErrorHandler errorHandler = HotArticleKafkaFailureHandler.create(
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 kafkaTemplate,
-                dlqMetrics,
-                retryIntervalMillis,
-                maxAttempts
+                (record, exception) -> new TopicPartition(
+                        HotArticleKafkaTopics.dlqTopic(record.topic()),
+                        -1
+                )
         );
+        recoverer.setFailIfSendResultIsError(true);
+        recoverer.setWaitForSendResultTimeout(Duration.ofSeconds(5));
+
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+                recoverer,
+                new FixedBackOff(retryIntervalMillis, Math.max(0, maxAttempts - 1))
+        );
+        errorHandler.setCommitRecovered(true);
+        errorHandler.setRetryListeners(new RetryListener() {
+            @Override
+            public void failedDelivery(org.apache.kafka.clients.consumer.ConsumerRecord<?, ?> record,
+                                       Exception exception,
+                                       int deliveryAttempt) {
+                dlqMetrics.recordRetry(HotArticleKafkaTopics.originalTopic(record.topic()), deliveryAttempt);
+            }
+
+            @Override
+            public void recovered(org.apache.kafka.clients.consumer.ConsumerRecord<?, ?> record,
+                                  Exception exception) {
+                dlqMetrics.recordDlq(HotArticleKafkaTopics.originalTopic(record.topic()));
+            }
+
+            @Override
+            public void recoveryFailed(org.apache.kafka.clients.consumer.ConsumerRecord<?, ?> record,
+                                       Exception original,
+                                       Exception failure) {
+                dlqMetrics.recordDlqPublishFailure(HotArticleKafkaTopics.originalTopic(record.topic()));
+            }
+        });
         factory.setCommonErrorHandler(errorHandler);
         return factory;
     }
