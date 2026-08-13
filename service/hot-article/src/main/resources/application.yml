@@ -20,6 +20,18 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       enable-auto-commit: false
+modu:
+  kafka:
+    failure:
+      # 최초 처리 포함 3회 실패하면 서비스 전용 DLQ로 격리한다.
+      max-attempts: ${KAFKA_FAILURE_MAX_ATTEMPTS:3}
+      retry-interval-ms: ${KAFKA_FAILURE_RETRY_INTERVAL_MS:1000}
+      # DLQ는 한 poll에 최대 100건씩, poll 사이 30초 간격으로 재발행한다.
+      replay-batch-size: ${KAFKA_DLQ_REPLAY_BATCH_SIZE:100}
+      replay-interval-ms: ${KAFKA_DLQ_REPLAY_INTERVAL_MS:30000}
+      replay-send-timeout-seconds: ${KAFKA_DLQ_REPLAY_SEND_TIMEOUT_SECONDS:5}
+      # 영구 실패는 무한 순환시키지 않고 3회 뒤 PARKING 토픽에 보존한다.
+      max-replay-attempts: ${KAFKA_DLQ_MAX_REPLAY_ATTEMPTS:3}
 endpoints:
   board-article-service:
     url: ${ARTICLE_SERVICE_URL:http://127.0.0.1:9000}

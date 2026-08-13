@@ -4,6 +4,7 @@ import board.common.event.Event;
 import board.common.event.EventConsumeMetrics;
 import board.common.event.EventPayload;
 import board.common.event.payload.EventType;
+import board.hotarticle.kafka.HotArticleKafkaTopics;
 import board.hotarticle.service.HotArticleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,10 @@ public class HotArticleEventConsumer {
             EventType.Topic.BOARD_COMMENT,
             EventType.Topic.BOARD_LIKE,
             EventType.Topic.BOARD_VIEW,
+            HotArticleKafkaTopics.BOARD_ARTICLE_REPLAY,
+            HotArticleKafkaTopics.BOARD_COMMENT_REPLAY,
+            HotArticleKafkaTopics.BOARD_LIKE_REPLAY,
+            HotArticleKafkaTopics.BOARD_VIEW_REPLAY,
     })
     public void listen(
             String message,

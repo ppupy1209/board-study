@@ -4,4 +4,6 @@ dependencies {
     implementation 'org.springframework.kafka:spring-kafka'
     implementation project(':common:event')
     implementation project(':common:data-serializer')
+
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
 }
