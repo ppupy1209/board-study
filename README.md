@@ -9,7 +9,6 @@
 - Grafana: `http://localhost:3001` (`admin` / `admin`, 로컬 전용)
 - Prometheus: `http://localhost:9090`
 - Article API: `http://localhost:9000`
-- Search API (Elasticsearch + Nori): `http://localhost:9008`
 - Media API: `http://localhost:9007`
 - MinIO Console: `http://localhost:9101` (`modu-square` / `local-development`, 로컬 전용)
 
@@ -64,17 +63,9 @@ TEST_ID=soak-1 STABLE_RATE=1000 DURATION=60m docker compose run --rm k6 run -o e
 
 # Kafka 장애 -> Outbox 보존 -> 복구 -> 정합성 확인 (Kafka 중단/복구까지 자동)
 bash load-tests/kafka-recovery.sh
-
-# 검색 비교: LIKE 기준선 / Elasticsearch + Nori
-SEARCH_TEST_ENGINE=like TEST_ID=search-like-1 RATE=1 TIME_UNIT=30s DURATION=6m \
-  docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/article-search.js
-SEARCH_TEST_ENGINE=elasticsearch TEST_ID=search-es-1 RATE=1 TIME_UNIT=30s DURATION=6m \
-  docker compose run --rm k6 run -o experimental-prometheus-rw /scripts/article-search.js
 ```
 
-검색 비교의 기본 도착률은 `1/30 req/s`이며 6분간 각 검색어를 두 번씩 요청한다. 1,500만 건에서 선행 와일드카드 LIKE 한 건이 1분 이상 걸릴 수 있어, 일반 API 부하처럼 처음부터 높은 RPS를 주면 비교 전에 로컬 MySQL이 동시 전체 스캔으로 포화된다. 검색어는 실제 존재하는 저빈도 문구 4개와 부재어 2개를 시나리오 전체 반복 번호로 순환해 모든 엔진에 같은 순서로 보낸다.
-
-Grafana의 **모두의 광장 성능·병목 분석** 대시보드에서 `testid`로 실행을 골라 결과를 확인합니다. 검색 비교는 전용 **모두의 광장 검색 성능 비교** 대시보드를 사용합니다.
+Grafana의 **모두의 광장 성능·병목 분석** 대시보드에서 `testid`로 실행을 골라 결과를 확인합니다.
 
 > k6 0.57.0에서 Prometheus remote write output(`experimental-prometheus-rw`)은 아직 **experimental**입니다.
 > 출력 이름과 동작이 버전에 따라 바뀔 수 있어 이미지 버전을 `grafana/k6:0.57.0`으로 고정했습니다.
@@ -99,7 +90,6 @@ Grafana의 **모두의 광장 성능·병목 분석** 대시보드에서 `testid
 | 부하 검증 | smoke/average/breakpoint/deep-page/mixed/spike/soak/kafka-recovery 분리 | `load-tests/k6/` |
 | 동시성 정확성 | count 행 원자적 upsert로 deadlock 제거 | `BoardArticleCountRepository`, `ArticleCommentCountRepository`, `ArticleLikeCountRepository` |
 | 이미지 전송 비용 | Presigned URL 직접 업로드 + Kafka 비동기 WebP 변환 | `service:media`, `load-tests/k6/media-upload.js` |
-| 검색 | LIKE 기준선, Kafka 동기화 Elasticsearch + Nori | `service:article`, `service:search`, `load-tests/k6/article-search.js` |
 
 개발 과정의 선택 이유와 한계는 [개발 기록](docs/development-log.md), 대용량 실험 재현 절차는 [성능 테스트 가이드](docs/performance-test.md), 인기글 호출 증폭 개선은 [인기글 조회 부하 테스트](docs/hot-article-load-test.md), 이미지 첨부와 전송량 개선은 [이미지 전송 비용 최적화](docs/media-image-delivery.md)에 정리했습니다.
 
@@ -154,7 +144,6 @@ Kafka 기반 이벤트 처리와 Outbox Pattern을 적용해 서비스 간 데�
 ### Database / Infra
 
 - MySQL
-- Elasticsearch 8.17.4 + Nori
 - Redis
 - Kafka
 
@@ -181,7 +170,6 @@ modu-square
     ├── comment
     ├── hot-article
     ├── like
-    ├── search
     └── view
 ├── web
 │   └── Apple Design 원칙을 적용한 커뮤니티 UI
@@ -206,7 +194,6 @@ modu-square
 | service:view | 게시글 조회수 증가와 중복 조회 방지 |
 | service:hot-article | 이벤트 기반 인기글 점수 계산 |
 | service:article-read | 게시글 조회 모델 분리 학습용 모듈 |
-| service:search | Kafka 이벤트로 동기화되는 Elasticsearch + Nori 검색 조회 모델과 체크포인트 재구축 |
 
 ---
 

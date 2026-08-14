@@ -178,31 +178,7 @@ at-least-once는 중복을 허용합니다. 따라서 Consumer는 이벤트 ID�
 
 수치는 합격을 보장하는 장식이 아니라, 로컬 환경에서 회귀를 발견하기 위한 출발점입니다. 실제 결과는 CPU, 메모리, 디스크와 적재 완료 여부를 함께 기록해야 비교할 수 있습니다.
 
-## 11. 검색: 선행 와일드카드에서 Elasticsearch + Nori 조회 모델로
-
-### 문제를 재현한 방법
-
-`title LIKE '%검색어%' OR content LIKE '%검색어%'`는 검색어 앞의 `%` 때문에 B-Tree에서 문자열의 시작 위치를 찾을 수 없다. `board_id` 인덱스로 후보를 줄일 수 있어도 결과가 오래된 글에 있거나 아예 없으면 제목과 본문을 끝까지 검사한다.
-
-15,000,112건에서 존재하지 않는 검색어를 조회하면 `LIMIT 20`을 채울 수 없어 LIKE가 게시판 후보를 끝까지 읽는다. 이 경로를 비교 기준선으로 남기고 UI 검색은 Elasticsearch + Nori로 단일화했다.
-
-### 선택 — Elasticsearch + Nori
-
-- Nori `mixed` 형태소 분석, 제목 2배 가중치, 본문 1배 가중치
-- Article Outbox 이벤트를 Kafka로 소비해 `articleId` 기준 upsert/delete
-- 과거 데이터는 Article keyset API → Bulk API로 재구축하고 배치마다 체크포인트 저장
-- 재구축 중 refresh를 끄고 완료 후 `5s`로 복구
-- MySQL과 검색 부하를 분리하고 향후 사용자 사전·동의어·오타 허용·자동완성으로 확장 가능
-
-첫 구현에서는 문서 수 15,000,112건이 일치했지만 Bulk NDJSON의 charset 누락으로 한국어가 `?`로 저장됐다. 문서 수 검증만으로는 발견하지 못할 오류였다. `application/x-ndjson;charset=UTF-8`을 명시하고 원문·적중·부재 검색을 완료 조건에 추가했으며, UTF-8 회귀 테스트로 고정했다.
-
-<!-- search-development-results -->
-
-### 결정
-
-운영 검색 경로는 Elasticsearch + Nori로 확정했다. LIKE API는 성능 문제를 재현하는 부하 테스트 전용 기준선일 뿐 UI에서 호출하지 않는다. 원본 DB와 검색 부하를 분리하고 한국어 분석·사용자 사전·동의어·오타 허용으로 확장할 수 있는 대신, Kafka/refresh 지연과 전체 재구축을 검색 기능의 운영 비용으로 받아들인다.
-
-## 12. 다음 개선
+## 11. 다음 개선
 
 - Query Model 전체 재구축과 체크포인트
 - Kafka 파티션 확대 시 key ordering 검증

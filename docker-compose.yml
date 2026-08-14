@@ -129,23 +129,6 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
 
-  elasticsearch:
-    build: ./infra/elasticsearch
-    mem_limit: 1536m
-    environment:
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "-Xms768m -Xmx768m"
-    ports: ["9200:9200"]
-    volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-    restart: unless-stopped
-
   article:
     build:
       context: .
@@ -159,13 +142,7 @@ services:
       DB_USERNAME: root
       DB_PASSWORD: root
     ports: ["9000:9000"]
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_started
+    depends_on: *service-dependencies
     restart: unless-stopped
 
   comment:
@@ -286,26 +263,6 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  search:
-    build:
-      context: .
-      args: { SERVICE: search }
-    mem_limit: 576m
-    environment:
-      <<: *service-environment
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-      ARTICLE_SERVICE_URL: http://article:9000
-      SEARCH_REINDEX_BATCH_SIZE: ${SEARCH_REINDEX_BATCH_SIZE:-5000}
-    ports: ["9008:9008"]
-    depends_on:
-      article:
-        condition: service_started
-      elasticsearch:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    restart: unless-stopped
-
   web:
     build: ./web
     environment:
@@ -317,7 +274,6 @@ services:
       NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL: http://localhost:9004
       NEXT_PUBLIC_NOTIFICATION_API_BASE_URL: http://localhost:9006
       NEXT_PUBLIC_MEDIA_API_BASE_URL: http://localhost:9007
-      NEXT_PUBLIC_SEARCH_API_BASE_URL: http://localhost:9008
     ports: ["${WEB_PORT:-3000}:3000"]
     depends_on:
       article:
@@ -333,8 +289,6 @@ services:
       notification:
         condition: service_started
       media:
-        condition: service_started
-      search:
         condition: service_started
     restart: unless-stopped
 
@@ -358,7 +312,6 @@ services:
       - article-read
       - notification
       - media
-      - search
 
   mysql-exporter:
     image: prom/mysqld-exporter:v0.15.1
@@ -450,8 +403,6 @@ services:
       ARTICLE_READ_URL: http://article-read:9005
       NOTIFICATION_URL: http://notification:9006
       MEDIA_URL: http://media:9007
-      SEARCH_URL: http://search:9008
-      SEARCH_TEST_ENGINE: ${SEARCH_TEST_ENGINE:-}
       TEST_ID: ${TEST_ID:-}
       TEST_TYPE: ${TEST_TYPE:-}
       DATASET: ${DATASET:-15000100}
@@ -461,9 +412,7 @@ services:
       # docker compose run은 여기에 선언한 변수만 컨테이너로 전달한다.
       # 선언을 빼먹으면 스크립트가 조용히 기본값으로 실행되므로 각 테스트의 조정 변수를 모두 나열한다.
       RATE: ${RATE:-}
-      TIME_UNIT: ${TIME_UNIT:-}
       DURATION: ${DURATION:-}
-      REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-}
       ARTICLE_ID_MODE: ${ARTICLE_ID_MODE:-}
       PAGE_SIZE: ${PAGE_SIZE:-}
       TEST_ARTICLE_ID: ${TEST_ARTICLE_ID:-}
@@ -501,4 +450,3 @@ volumes:
   minio-data:
   prometheus-data:
   grafana-data:
-  elasticsearch-data:

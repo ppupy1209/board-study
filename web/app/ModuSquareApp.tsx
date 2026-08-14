@@ -6,7 +6,6 @@ import { CommunityFooter, CommunityHeader } from "./CommunityChrome";
 import {
   ARTICLE_API,
   HOT_ARTICLE_API,
-  SEARCH_API,
   Article,
   HotArticle,
   normalizeArticle,
@@ -106,8 +105,6 @@ export function ModuSquareApp() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [hotArticles, setHotArticles] = useState<HotArticle[]>([]);
-  const [searchResults, setSearchResults] = useState<Article[] | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     const restoreBrowserState = window.setTimeout(() => {
@@ -154,13 +151,12 @@ export function ModuSquareApp() {
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const source = searchResults ?? articles;
-    return source.filter((article) => {
+    return articles.filter((article) => {
       const inCategory = category === "전체" || article.tag === category;
-      const inQuery = searchResults !== null || !normalized || `${article.title} ${article.content} modu_${article.writerId}`.toLowerCase().includes(normalized);
+      const inQuery = !normalized || `${article.title} ${article.content} modu_${article.writerId}`.toLowerCase().includes(normalized);
       return inCategory && inQuery;
     });
-  }, [articles, category, query, searchResults]);
+  }, [articles, category, query]);
 
   const popularArticles = useMemo<HotArticle[]>(() => {
     if (hotArticles.length) return hotArticles;
@@ -171,33 +167,10 @@ export function ModuSquareApp() {
     }));
   }, [articles, hotArticles]);
 
-  async function submitSearch(event: FormEvent) {
+  function submitSearch(event: FormEvent) {
     event.preventDefault();
-    const normalized = query.trim();
-    if (!normalized) {
-      setSearchResults(null);
-      setNotice("새로운 이야기부터 보여드리고 있어요.");
-      return;
-    }
-    if (normalized.length < 2) {
-      setNotice("검색어를 두 글자 이상 입력해 주세요.");
-      return;
-    }
-
-    setCategory("전체");
-    setIsSearching(true);
-    try {
-      const endpoint = `${SEARCH_API}/v1/search/articles`;
-      const response = await fetch(`${endpoint}?boardId=1&q=${encodeURIComponent(normalized)}&limit=20`);
-      if (!response.ok) throw new Error("search unavailable");
-      const results = await response.json() as Article[];
-      setSearchResults(enrichArticles(results));
-      setNotice(`“${normalized}” 검색 결과 ${results.length}건입니다.`);
-    } catch {
-      setNotice("검색 결과를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
-    } finally {
-      setIsSearching(false);
-    }
+    if (query.trim()) setCategory("전체");
+    setNotice(query.trim() ? `“${query.trim()}” 검색 결과입니다.` : "새로운 이야기부터 보여드리고 있어요.");
   }
 
   async function loadMore() {
@@ -246,15 +219,7 @@ export function ModuSquareApp() {
 
   return (
     <div className="site-shell">
-      <CommunityHeader
-        query={query}
-        onQueryChange={(value) => {
-          setQuery(value);
-          setSearchResults(null);
-        }}
-        onSearchSubmit={submitSearch}
-        active="home"
-      />
+      <CommunityHeader query={query} onQueryChange={setQuery} onSearchSubmit={submitSearch} active="home" />
 
       <main id="top">
         <section className="signal-hero" aria-labelledby="hero-title">
@@ -281,7 +246,7 @@ export function ModuSquareApp() {
                 <button key={item} type="button" role="tab" aria-selected={category === item} onClick={() => setCategory(item)}>{item}</button>
               ))}
             </div>
-            {(isSearching || notice) && <p className="notice" role="status">{isSearching ? "검색 중…" : notice}</p>}
+            {notice && <p className="notice" role="status">{notice}</p>}
             <div className="article-list">
               {filtered.map((article, index) => (
                 <article className="article-card" key={`${article.articleId}-${index}`}>
@@ -305,7 +270,7 @@ export function ModuSquareApp() {
               ))}
               {!filtered.length && <div className="empty-state"><strong>아직 이 주제의 이야기가 없어요.</strong><span>다른 키워드로 찾아보거나 첫 글을 시작해보세요.</span></div>}
             </div>
-            {searchResults === null && <button className="more-button" type="button" onClick={loadMore} disabled={isLoadingMore}>{isLoadingMore ? "불러오는 중…" : "이야기 더 보기"} <span>↓</span></button>}
+            <button className="more-button" type="button" onClick={loadMore} disabled={isLoadingMore}>{isLoadingMore ? "불러오는 중…" : "이야기 더 보기"} <span>↓</span></button>
           </section>
 
           <aside className="side-column">

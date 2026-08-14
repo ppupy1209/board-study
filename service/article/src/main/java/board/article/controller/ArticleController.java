@@ -1,7 +1,6 @@
 package board.article.controller;
 
 import board.article.service.ArticleService;
-import board.article.service.ArticleSearchService;
 import board.article.service.request.ArticleCreateRequest;
 import board.article.service.request.ArticleUpdateRequest;
 import board.article.service.response.ArticlePageResponse;
@@ -15,16 +14,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ArticleController {
     private final ArticleService articleService;
-    private final ArticleSearchService articleSearchService;
-
-    @GetMapping("/v1/articles/search/like")
-    public List<ArticleResponse> searchByLike(
-            @RequestParam("boardId") Long boardId,
-            @RequestParam("q") String query,
-            @RequestParam(value = "limit", defaultValue = "20") int limit
-    ) {
-        return articleSearchService.searchByLike(boardId, query, limit);
-    }
 
     @GetMapping("/v1/articles/{articleId}")
     public ArticleResponse read(@PathVariable Long articleId) {
