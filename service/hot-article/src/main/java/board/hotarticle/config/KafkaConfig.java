@@ -2,6 +2,7 @@ package board.hotarticle.config;
 
 import board.common.event.EventConsumeMetrics;
 import board.hotarticle.kafka.HotArticleDlqMetrics;
+import board.hotarticle.kafka.HotArticleKafkaFailureClassifier;
 import board.hotarticle.kafka.HotArticleKafkaTopics;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -39,10 +40,16 @@ public class KafkaConfig {
     }
 
     @Bean
+    public HotArticleKafkaFailureClassifier hotArticleKafkaFailureClassifier() {
+        return new HotArticleKafkaFailureClassifier();
+    }
+
+    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
             ConsumerFactory<String, String> consumerFactory,
             KafkaTemplate<String, String> kafkaTemplate,
             HotArticleDlqMetrics dlqMetrics,
+            HotArticleKafkaFailureClassifier failureClassifier,
             @Value("${modu.kafka.failure.retry-interval-ms:1000}") long retryIntervalMillis,
             @Value("${modu.kafka.failure.max-attempts:3}") long maxAttempts
     ) {
@@ -54,7 +61,11 @@ public class KafkaConfig {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 kafkaTemplate,
                 (record, exception) -> new TopicPartition(
-                        HotArticleKafkaTopics.dlqTopic(record.topic()),
+                        failureClassifier.isRetryable(exception)
+                                ? HotArticleKafkaTopics.dlqTopic(record.topic())
+                                : HotArticleKafkaTopics.parkingTopic(
+                                        HotArticleKafkaTopics.originalTopic(record.topic())
+                                ),
                         -1
                 )
         );
@@ -65,6 +76,7 @@ public class KafkaConfig {
                 recoverer,
                 new FixedBackOff(retryIntervalMillis, Math.max(0, maxAttempts - 1))
         );
+        failureClassifier.applyTo(errorHandler);
         errorHandler.setCommitRecovered(true);
         errorHandler.setRetryListeners(new RetryListener() {
             @Override
@@ -77,14 +89,24 @@ public class KafkaConfig {
             @Override
             public void recovered(org.apache.kafka.clients.consumer.ConsumerRecord<?, ?> record,
                                   Exception exception) {
-                dlqMetrics.recordDlq(HotArticleKafkaTopics.originalTopic(record.topic()));
+                String originalTopic = HotArticleKafkaTopics.originalTopic(record.topic());
+                if (failureClassifier.isRetryable(exception)) {
+                    dlqMetrics.recordDlq(originalTopic);
+                } else {
+                    dlqMetrics.recordParking(originalTopic);
+                }
             }
 
             @Override
             public void recoveryFailed(org.apache.kafka.clients.consumer.ConsumerRecord<?, ?> record,
                                        Exception original,
                                        Exception failure) {
-                dlqMetrics.recordDlqPublishFailure(HotArticleKafkaTopics.originalTopic(record.topic()));
+                String originalTopic = HotArticleKafkaTopics.originalTopic(record.topic());
+                if (failureClassifier.isRetryable(original)) {
+                    dlqMetrics.recordDlqPublishFailure(originalTopic);
+                } else {
+                    dlqMetrics.recordParkingPublishFailure(originalTopic);
+                }
             }
         });
         factory.setCommonErrorHandler(errorHandler);
@@ -103,9 +125,10 @@ public class KafkaConfig {
         dlqConsumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         long worstCaseBatchMillis = replayBatchSize * replaySendTimeoutSeconds * 1_000L;
         long minimumPollIntervalMillis = replayIntervalMillis + worstCaseBatchMillis + 60_000L;
+        long maxPollIntervalMillis = Math.max(DEFAULT_MAX_POLL_INTERVAL_MILLIS, minimumPollIntervalMillis);
         dlqConsumerProperties.put(
                 ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG,
-                Math.max(DEFAULT_MAX_POLL_INTERVAL_MILLIS, minimumPollIntervalMillis)
+                Math.toIntExact(Math.min(Integer.MAX_VALUE, maxPollIntervalMillis))
         );
 
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();

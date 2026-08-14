@@ -25,8 +25,16 @@ public class HotArticleDlqMetrics {
         delivery(topic, "dlq").increment();
     }
 
+    public void recordParking(String topic) {
+        delivery(topic, "parking").increment();
+    }
+
     public void recordDlqPublishFailure(String topic) {
         delivery(topic, "dlq_publish_failed").increment();
+    }
+
+    public void recordParkingPublishFailure(String topic) {
+        delivery(topic, "parking_publish_failed").increment();
     }
 
     public void recordReplayBatch(int size) {

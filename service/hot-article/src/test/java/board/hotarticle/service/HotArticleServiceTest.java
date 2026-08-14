@@ -3,6 +3,7 @@ package board.hotarticle.service;
 import board.common.event.Event;
 import board.common.event.payload.EventType;
 import board.hotarticle.client.ArticleClient;
+import board.hotarticle.kafka.HotArticleEventPosition;
 import board.hotarticle.repository.HotArticleListRepository;
 import board.hotarticle.repository.HotArticleQueryModel;
 import board.hotarticle.repository.HotArticleQueryModelRepository;
@@ -10,7 +11,6 @@ import board.hotarticle.service.response.HotArticleResponse;
 import board.hotarticle.service.eventhandler.EventHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.BDDMockito;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -23,12 +23,17 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class HotArticleServiceTest {
+    private static final HotArticleEventPosition POSITION = new HotArticleEventPosition(
+            EventType.Topic.BOARD_ARTICLE,
+            0,
+            1L
+    );
+
     @InjectMocks
     HotArticleService hotArticleService;
     @Mock
@@ -43,6 +48,8 @@ class HotArticleServiceTest {
     HotArticleQueryModelRepository hotArticleQueryModelRepository;
     @Mock
     HotArticleReadModelMetrics hotArticleReadModelMetrics;
+    @Mock
+    HotArticleEventVersionGuard eventVersionGuard;
 
     @Test
     void handleEventIfEventHandlerNotFoundTest() {
@@ -51,9 +58,9 @@ class HotArticleServiceTest {
         given(eventHandler.supports(event)).willReturn(false);
         given(eventHandlers.stream()).willReturn(Stream.of(eventHandler));
 
-        hotArticleService.handleEvent(event);
+        boolean handled = hotArticleService.handleIfLatest(event, POSITION);
 
-
+        assertThat(handled).isFalse();
         verify(eventHandler, never()).handle(event);
         verify(hotArticleScoreUpdater, never()).update(event, eventHandler);
     }
@@ -65,10 +72,13 @@ class HotArticleServiceTest {
 
         EventHandler eventHandler = mock(EventHandler.class);
         given(eventHandler.supports(event)).willReturn(true);
+        given(eventHandler.findArticleId(event)).willReturn(1L);
         given(eventHandlers.stream()).willReturn(Stream.of(eventHandler));
+        givenLatestEventIsHandled();
 
-        hotArticleService.handleEvent(event);
+        boolean handled = hotArticleService.handleIfLatest(event, POSITION);
 
+        assertThat(handled).isTrue();
         verify(eventHandler).handle(event);
         verify(hotArticleScoreUpdater, never()).update(event, eventHandler);
     }
@@ -80,10 +90,13 @@ class HotArticleServiceTest {
 
         EventHandler eventHandler = mock(EventHandler.class);
         given(eventHandler.supports(event)).willReturn(true);
+        given(eventHandler.findArticleId(event)).willReturn(1L);
         given(eventHandlers.stream()).willReturn(Stream.of(eventHandler));
+        givenLatestEventIsHandled();
 
-        hotArticleService.handleEvent(event);
+        boolean handled = hotArticleService.handleIfLatest(event, POSITION);
 
+        assertThat(handled).isTrue();
         verify(eventHandler).handle(event);
         verify(hotArticleScoreUpdater, never()).update(event, eventHandler);
     }
@@ -95,10 +108,13 @@ class HotArticleServiceTest {
 
         EventHandler eventHandler = mock(EventHandler.class);
         given(eventHandler.supports(event)).willReturn(true);
+        given(eventHandler.findArticleId(event)).willReturn(1L);
         given(eventHandlers.stream()).willReturn(Stream.of(eventHandler));
+        givenLatestEventIsHandled();
 
-        hotArticleService.handleEvent(event);
+        boolean handled = hotArticleService.handleIfLatest(event, POSITION);
 
+        assertThat(handled).isTrue();
         verify(eventHandler).handle(event);
         verify(hotArticleScoreUpdater, never()).update(event, eventHandler);
     }
@@ -110,10 +126,13 @@ class HotArticleServiceTest {
 
         EventHandler eventHandler = mock(EventHandler.class);
         given(eventHandler.supports(event)).willReturn(true);
+        given(eventHandler.findArticleId(event)).willReturn(1L);
         given(eventHandlers.stream()).willReturn(Stream.of(eventHandler));
+        givenLatestEventIsHandled();
 
-        hotArticleService.handleEvent(event);
+        boolean handled = hotArticleService.handleIfLatest(event, POSITION);
 
+        assertThat(handled).isTrue();
         verify(eventHandler, never()).handle(event);
         verify(hotArticleScoreUpdater).update(event, eventHandler);
     }
@@ -159,5 +178,13 @@ class HotArticleServiceTest {
 
     private String displayDate() {
         return board.hotarticle.utils.TimeCalculatorUtils.calculateHotArticleDate();
+    }
+
+    private void givenLatestEventIsHandled() {
+        given(eventVersionGuard.runIfLatest(eq(POSITION), eq(1L), any(Runnable.class)))
+                .willAnswer(invocation -> {
+                    invocation.getArgument(2, Runnable.class).run();
+                    return true;
+                });
     }
 }

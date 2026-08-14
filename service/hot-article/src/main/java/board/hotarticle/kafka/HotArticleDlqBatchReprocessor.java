@@ -68,13 +68,8 @@ public class HotArticleDlqBatchReprocessor {
                 : HotArticleKafkaTopics.replayTopic(originalTopic);
 
         ProducerRecord<String, String> output = new ProducerRecord<>(destination, record.key(), record.value());
-        if (park) {
-            record.headers().forEach(header -> {
-                if (!REPLAY_COUNT_HEADER.equals(header.key())) {
-                    output.headers().add(new RecordHeader(header.key(), header.value()));
-                }
-            });
-        }
+        copyHeaders(record, output);
+        HotArticleEventPosition.fromDeadLetter(record).addTo(output.headers());
         output.headers().add(new RecordHeader(
                 REPLAY_COUNT_HEADER,
                 ByteBuffer.allocate(Integer.BYTES).putInt(replayCount + 1).array()
@@ -99,6 +94,18 @@ public class HotArticleDlqBatchReprocessor {
             metrics.recordReplay(originalTopic, "failed");
             throw new IllegalStateException("Failed to replay DLQ record", e);
         }
+    }
+
+    private void copyHeaders(
+            ConsumerRecord<String, String> source,
+            ProducerRecord<String, String> destination
+    ) {
+        source.headers().forEach(header -> {
+            if (!REPLAY_COUNT_HEADER.equals(header.key())
+                    && !HotArticleEventPosition.isPositionHeader(header.key())) {
+                destination.headers().add(new RecordHeader(header.key(), header.value()));
+            }
+        });
     }
 
     private String originalTopic(ConsumerRecord<String, String> record) {

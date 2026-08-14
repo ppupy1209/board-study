@@ -61,6 +61,9 @@ class HotArticleDlqBatchReprocessorTest {
         assertThat(replayed.key()).isEqualTo("1");
         assertThat(replayed.value()).isEqualTo("payload");
         assertThat(replayCount(replayed)).isEqualTo(1);
+        assertThat(originalPosition(replayed)).isEqualTo(
+                new HotArticleEventPosition("board-article", 1, 42L)
+        );
         verify(acknowledgment).acknowledge();
         assertThat(meterRegistry.get("modu.kafka.dlq.replay")
                 .tag("topic", "board-article")
@@ -112,6 +115,14 @@ class HotArticleDlqBatchReprocessorTest {
                 KafkaHeaders.DLT_ORIGINAL_TOPIC,
                 "board-article".getBytes(StandardCharsets.UTF_8)
         ));
+        record.headers().add(new RecordHeader(
+                KafkaHeaders.DLT_ORIGINAL_PARTITION,
+                ByteBuffer.allocate(Integer.BYTES).putInt(1).array()
+        ));
+        record.headers().add(new RecordHeader(
+                KafkaHeaders.DLT_ORIGINAL_OFFSET,
+                ByteBuffer.allocate(Long.BYTES).putLong(42L).array()
+        ));
         if (replayCount > 0) {
             record.headers().add(new RecordHeader(
                     HotArticleDlqBatchReprocessor.REPLAY_COUNT_HEADER,
@@ -125,6 +136,20 @@ class HotArticleDlqBatchReprocessorTest {
         return ByteBuffer.wrap(record.headers()
                 .lastHeader(HotArticleDlqBatchReprocessor.REPLAY_COUNT_HEADER)
                 .value()).getInt();
+    }
+
+    private HotArticleEventPosition originalPosition(ProducerRecord<String, String> record) {
+        String topic = new String(
+                record.headers().lastHeader(HotArticleEventPosition.ORIGINAL_TOPIC_HEADER).value(),
+                StandardCharsets.UTF_8
+        );
+        int partition = ByteBuffer.wrap(record.headers()
+                .lastHeader(HotArticleEventPosition.ORIGINAL_PARTITION_HEADER)
+                .value()).getInt();
+        long offset = ByteBuffer.wrap(record.headers()
+                .lastHeader(HotArticleEventPosition.ORIGINAL_OFFSET_HEADER)
+                .value()).getLong();
+        return new HotArticleEventPosition(topic, partition, offset);
     }
 
     @SuppressWarnings("unchecked")

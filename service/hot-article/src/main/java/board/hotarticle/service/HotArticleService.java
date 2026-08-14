@@ -4,6 +4,8 @@ import board.common.event.Event;
 import board.common.event.EventPayload;
 import board.common.event.payload.EventType;
 import board.hotarticle.client.ArticleClient;
+import board.hotarticle.kafka.HotArticleEventPosition;
+import board.hotarticle.kafka.InvalidHotArticleEventException;
 import board.hotarticle.repository.HotArticleListRepository;
 import board.hotarticle.repository.HotArticleQueryModel;
 import board.hotarticle.repository.HotArticleQueryModelRepository;
@@ -30,13 +32,26 @@ public class HotArticleService {
     private final HotArticleListRepository hotArticleListRepository;
     private final HotArticleQueryModelRepository hotArticleQueryModelRepository;
     private final HotArticleReadModelMetrics hotArticleReadModelMetrics;
+    private final HotArticleEventVersionGuard eventVersionGuard;
 
-    public void handleEvent(Event<EventPayload> event) {
+    public boolean handleIfLatest(Event<EventPayload> event, HotArticleEventPosition position) {
         EventHandler<EventPayload> eventHandler = findEventHandler(event);
         if (eventHandler == null) {
-            return;
+            return false;
         }
 
+        Long articleId = eventHandler.findArticleId(event);
+        if (articleId == null) {
+            throw new InvalidHotArticleEventException("Hot-article event has no articleId");
+        }
+        return eventVersionGuard.runIfLatest(
+                position,
+                articleId,
+                () -> handleEvent(event, eventHandler)
+        );
+    }
+
+    private void handleEvent(Event<EventPayload> event, EventHandler<EventPayload> eventHandler) {
         if (isArticleProjectionEvent(event)) {
             eventHandler.handle(event);
         } else {

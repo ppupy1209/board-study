@@ -4,14 +4,15 @@ import board.common.event.Event;
 import board.common.event.EventConsumeMetrics;
 import board.common.event.EventPayload;
 import board.common.event.payload.EventType;
+import board.hotarticle.kafka.HotArticleEventPosition;
 import board.hotarticle.kafka.HotArticleKafkaTopics;
+import board.hotarticle.kafka.InvalidHotArticleEventException;
 import board.hotarticle.service.HotArticleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.kafka.support.KafkaHeaders;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -31,28 +32,45 @@ public class HotArticleEventConsumer {
             HotArticleKafkaTopics.BOARD_LIKE_REPLAY,
             HotArticleKafkaTopics.BOARD_VIEW_REPLAY,
     })
-    public void listen(
-            String message,
-            @Header(KafkaHeaders.RECEIVED_TIMESTAMP) long receivedTimestamp,
-            Acknowledgment ack
-    ) {
-        log.info("[HotArticleEventConsumer.listen] received message={}", message);
+    public void listen(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) {
+        log.info(
+                "[HotArticleEventConsumer.listen] topic={}, partition={}, offset={}",
+                record.topic(),
+                record.partition(),
+                record.offset()
+        );
         long startNanos = System.nanoTime();
-        Event<EventPayload> event = Event.fromJson(message);
-        if (event == null) {
-            eventConsumeMetrics.recordIgnored(null);
-            ack.acknowledge();
-            return;
-        }
+        Event<EventPayload> event = null;
         try {
-            hotArticleService.handleEvent(event);
-            eventConsumeMetrics.recordSuccess(event.getType(), startNanos, receivedTimestamp);
+            event = parseEvent(record.value());
+            HotArticleEventPosition position = HotArticleEventPosition.from(record);
+            boolean handled = hotArticleService.handleIfLatest(event, position);
+            if (handled) {
+                eventConsumeMetrics.recordSuccess(event.getType(), startNanos, record.timestamp());
+            } else {
+                eventConsumeMetrics.recordIgnored(event.getType());
+            }
         } catch (Exception e) {
-            eventConsumeMetrics.recordFailure(event.getType(), startNanos);
-            // 실패를 집계만 하고 예외는 그대로 올린다. ack를 건너뛰어 재전달되게 하는 기존 동작을 유지해야
-            // 처리 실패한 이벤트가 조용히 사라지지 않는다.
+            eventConsumeMetrics.recordFailure(event == null ? null : event.getType(), startNanos);
             throw e;
         }
-        ack.acknowledge();
+        acknowledgment.acknowledge();
+    }
+
+    private Event<EventPayload> parseEvent(String message) {
+        try {
+            Event<EventPayload> event = Event.fromJson(message);
+            if (event == null
+                    || event.getEventId() == null
+                    || event.getType() == null
+                    || event.getPayload() == null) {
+                throw new InvalidHotArticleEventException("Hot-article event is missing a required field");
+            }
+            return event;
+        } catch (InvalidHotArticleEventException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new InvalidHotArticleEventException("Hot-article event cannot be deserialized", e);
+        }
     }
 }
