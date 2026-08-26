@@ -91,7 +91,7 @@ public class ArticleReadService {
         Optional<ArticleQueryModel> cached = articleQueryModelRepository.read(articleId);
         if (cached.isPresent()) {
             queryModelMetrics.hit(1);
-            return ArticleReadResponse.from(cached.get(), viewClient.count(articleId));
+            return withCurrentCounts(cached.get());
         }
         queryModelMetrics.miss(1);
         if (missingArticleCacheRepository.isMissing(articleId)) {
@@ -101,7 +101,21 @@ public class ArticleReadService {
 
         ArticleQueryModel loaded = loadOnceOrWait(articleId)
                 .orElseThrow(() -> articleNotFound(articleId));
-        return ArticleReadResponse.from(loaded, viewClient.count(articleId));
+        return withCurrentCounts(loaded);
+    }
+
+    private ArticleReadResponse withCurrentCounts(ArticleQueryModel queryModel) {
+        Long articleId = queryModel.getArticleId();
+        CompletableFuture<Long> commentCount =
+                CompletableFuture.supplyAsync(() -> commentClient.count(articleId), articleReadFanoutExecutor);
+        CompletableFuture<Long> likeCount =
+                CompletableFuture.supplyAsync(() -> likeClient.count(articleId), articleReadFanoutExecutor);
+        CompletableFuture<Long> viewCount =
+                CompletableFuture.supplyAsync(() -> viewClient.count(articleId), articleReadFanoutExecutor);
+        queryModelMetrics.originCall("comment", 1);
+        queryModelMetrics.originCall("like", 1);
+        queryModelMetrics.originCall("view", 1);
+        return ArticleReadResponse.from(queryModel, commentCount.join(), likeCount.join(), viewCount.join());
     }
 
     /**
@@ -265,7 +279,12 @@ public class ArticleReadService {
             );
             // 다음 조회를 위해 조회 모델을 채워 둔다. 원본 목록으로 이미 다 만들었으므로 추가 비용이 없다.
             articleQueryModelRepository.create(queryModel, QUERY_MODEL_TTL);
-            responses.add(ArticleReadResponse.from(queryModel, views.getOrDefault(articleId, 0L)));
+            responses.add(ArticleReadResponse.from(
+                    queryModel,
+                    comments.getOrDefault(articleId, 0L),
+                    likes.getOrDefault(articleId, 0L),
+                    views.getOrDefault(articleId, 0L)
+            ));
         }
         return responses;
     }
@@ -290,13 +309,22 @@ public class ArticleReadService {
         }
 
         List<Long> presentIds = articleIds.stream().filter(queryModels::containsKey).toList();
+        Map<Long, Long> comments = commentClient.countAll(presentIds);
+        Map<Long, Long> likes = likeClient.countAll(presentIds);
         Map<Long, Long> views = viewClient.countAll(presentIds);
+        queryModelMetrics.originCall("comment", 1);
+        queryModelMetrics.originCall("like", 1);
         queryModelMetrics.originCall("view", 1);
 
         return presentIds.stream()
                 .map(queryModels::get)
                 .filter(Objects::nonNull)
-                .map(model -> ArticleReadResponse.from(model, views.getOrDefault(model.getArticleId(), 0L)))
+                .map(model -> ArticleReadResponse.from(
+                        model,
+                        comments.getOrDefault(model.getArticleId(), 0L),
+                        likes.getOrDefault(model.getArticleId(), 0L),
+                        views.getOrDefault(model.getArticleId(), 0L)
+                ))
                 .toList();
     }
 

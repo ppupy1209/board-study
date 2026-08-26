@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LOCAL_USER_ID, NOTIFICATION_API, Notification as NotificationItem } from "../lib/community-api";
+import { getOrCreateGuestIdentity, NOTIFICATION_API, Notification as NotificationItem } from "../lib/community-api";
 
 type HeaderProps = {
   query?: string;
   onQueryChange?: (value: string) => void;
   onSearchSubmit?: (event: FormEvent<HTMLFormElement>) => void;
-  active?: "home" | "popular";
+  active?: "home" | "community" | "popular";
 };
 
 function notificationSummary(notification: NotificationItem) {
@@ -24,14 +24,17 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
   const [localQuery, setLocalQuery] = useState("");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [guestUserId, setGuestUserId] = useState("");
   const searchValue = query ?? localQuery;
 
   useEffect(() => {
+    const identity = getOrCreateGuestIdentity();
+    const restoreGuest = window.setTimeout(() => setGuestUserId(identity.userId), 0);
     const controller = new AbortController();
 
     async function loadNotifications() {
       try {
-        const response = await fetch(`${NOTIFICATION_API}/v1/notifications/users/${LOCAL_USER_ID}?limit=10`, {
+        const response = await fetch(`${NOTIFICATION_API}/v1/notifications/users/${identity.userId}?limit=10`, {
           signal: controller.signal,
         });
         if (!response.ok) return;
@@ -45,6 +48,7 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
     loadNotifications();
     const intervalId = window.setInterval(loadNotifications, 30_000);
     return () => {
+      window.clearTimeout(restoreGuest);
       window.clearInterval(intervalId);
       controller.abort();
     };
@@ -72,7 +76,7 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
       <nav className="main-nav" aria-label="주요 메뉴">
         <Link className={active === "home" ? "active" : undefined} href="/">홈</Link>
         <Link className={active === "popular" ? "active" : undefined} href="/popular">인기글</Link>
-        <Link href="/#community">커뮤니티</Link>
+        <Link className={active === "community" ? "active" : undefined} href="/community">커뮤니티</Link>
       </nav>
       <form className="search" onSubmit={submit} role="search">
         <span aria-hidden="true">⌕</span>
@@ -119,7 +123,7 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
           </section>
         )}
       </div>
-      <Link className="profile-button" href="/?q=modu_1" aria-label="내가 쓴 글">YW</Link>
+      <Link className="profile-button guest-profile" href={guestUserId ? `/?q=modu_${guestUserId}` : "/"} aria-label="내가 쓴 글">Guest</Link>
     </header>
   );
 }
@@ -129,7 +133,7 @@ export function CommunityFooter() {
     <footer>
       <span>© 2026 Modu Square</span>
       <span>오늘의 생각이 편안한 대화가 되는 곳</span>
-      <nav><Link href="/popular">인기글</Link><Link href="/#community">커뮤니티 약속</Link></nav>
+      <nav><Link href="/popular">인기글</Link><Link href="/community">커뮤니티</Link><Link href="/write">새 글 쓰기</Link></nav>
     </footer>
   );
 }

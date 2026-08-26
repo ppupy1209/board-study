@@ -8,7 +8,7 @@ import {
   ARTICLE_API,
   Article,
   BOARD_ID,
-  LOCAL_USER_ID,
+  getOrCreateGuestIdentity,
   MEDIA_API,
   MediaAsset,
   UploadTicket,
@@ -141,6 +141,7 @@ export function WriteArticlePage() {
     let createdArticle: Article | null = null;
 
     try {
+      const guestUserId = getOrCreateGuestIdentity().userId;
       for (const attachment of attachmentRef.current) {
         const media = await uploadImage(attachment);
         uploadedMediaIds.push(media.mediaId);
@@ -152,7 +153,7 @@ export function WriteArticlePage() {
         body: JSON.stringify({
           title: normalizedTitle,
           content: normalizedContent,
-          writerId: LOCAL_USER_ID,
+          writerId: guestUserId,
           boardId: BOARD_ID,
         }),
       });

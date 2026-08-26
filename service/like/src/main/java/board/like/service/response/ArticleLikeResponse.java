@@ -17,6 +17,7 @@ public class ArticleLikeResponse {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     private LocalDateTime createdAt;
+    private boolean liked;
 
     public static ArticleLikeResponse from(ArticleLike articleLike) {
         ArticleLikeResponse response = new ArticleLikeResponse();
@@ -24,6 +25,15 @@ public class ArticleLikeResponse {
         response.articleId = articleLike.getArticleId();
         response.userId = articleLike.getUserId();
         response.createdAt = articleLike.getCreatedAt();
+        response.liked = true;
+        return response;
+    }
+
+    public static ArticleLikeResponse notLiked(Long articleId, Long userId) {
+        ArticleLikeResponse response = new ArticleLikeResponse();
+        response.articleId = articleId;
+        response.userId = userId;
+        response.liked = false;
         return response;
     }
 }

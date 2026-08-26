@@ -30,7 +30,7 @@ public class ArticleLikeService {
     public ArticleLikeResponse read(Long articleId, Long userId) {
         return articleLikeRepository.findByArticleIdAndUserId(articleId, userId)
                 .map(ArticleLikeResponse::from)
-                .orElseThrow();
+                .orElseGet(() -> ArticleLikeResponse.notLiked(articleId, userId));
     }
 
     /**

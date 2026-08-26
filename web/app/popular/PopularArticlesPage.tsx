@@ -3,29 +3,23 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CommunityFooter, CommunityHeader, CommunityPage } from "../CommunityChrome";
-import { HOT_ARTICLE_API, HotArticle, normalizeArticleTitle } from "../../lib/community-api";
+import { Article, fetchPopularArticles } from "../../lib/community-api";
 
 export function PopularArticlesPage() {
-  const [articles, setArticles] = useState<HotArticle[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${HOT_ARTICLE_API}/v1/hot-articles/articles`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error("hot article api unavailable");
-        return response.json();
-      })
-      .then((items: HotArticle[]) => setArticles(items.slice(0, 10).map((item) => ({
-        ...item,
-        articleId: String(item.articleId),
-        title: normalizeArticleTitle(String(item.articleId), item.title),
-      }))))
+    fetchPopularArticles(controller.signal)
+      .then((items) => setArticles(items))
       .catch((error: Error) => {
         if (error.name !== "AbortError") setHasError(true);
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
 
     return () => controller.abort();
   }, []);
@@ -50,7 +44,7 @@ export function PopularArticlesPage() {
                   <strong>{String(index + 1).padStart(2, "0")}</strong>
                   <Link href={`/articles/${article.articleId}`}>
                     <span>{article.title}</span>
-                    <small>지금 대화가 활발한 이야기 <b>→</b></small>
+                    <small>좋아요 {(article.articleLikeCount ?? 0).toLocaleString("ko-KR")}개, 대화 {(article.articleCommentCount ?? 0).toLocaleString("ko-KR")}개 <b>→</b></small>
                   </Link>
                 </li>
               ))}

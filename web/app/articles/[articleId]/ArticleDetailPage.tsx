@@ -12,9 +12,10 @@ import {
   MEDIA_API,
   VIEW_API,
   Article,
+  ArticleLikeStatus,
   Comment,
+  getOrCreateGuestIdentity,
   MediaAsset,
-  LOCAL_USER_ID,
   normalizeArticle,
   publishedAt,
   requestJson,
@@ -38,6 +39,14 @@ export function ArticleDetailPage() {
   const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
+  const [guestUserId, setGuestUserId] = useState("");
+
+  useEffect(() => {
+    const restoreGuest = window.setTimeout(() => {
+      setGuestUserId(getOrCreateGuestIdentity().userId);
+    }, 0);
+    return () => window.clearTimeout(restoreGuest);
+  }, []);
 
   const loadComments = useCallback(async () => {
     const data = await requestJson<CommentPageResponse>(`${COMMENT_API}/v2/comments?articleId=${articleId}&page=1&pageSize=50`);
@@ -46,6 +55,7 @@ export function ArticleDetailPage() {
   }, [articleId]);
 
   useEffect(() => {
+    if (!guestUserId) return;
     let cancelled = false;
     async function load() {
       setIsLoading(true);
@@ -59,12 +69,12 @@ export function ArticleDetailPage() {
 
         const [commentsResult, viewResult, likedResult] = await Promise.allSettled([
           loadComments(),
-          requestJson<number>(`${VIEW_API}/v1/article-views/articles/${articleId}/users/${LOCAL_USER_ID}`, { method: "POST" }),
-          fetch(`${LIKE_API}/v1/article-likes/articles/${articleId}/users/${LOCAL_USER_ID}`),
+          requestJson<number>(`${VIEW_API}/v1/article-views/articles/${articleId}/users/${guestUserId}`, { method: "POST" }),
+          requestJson<ArticleLikeStatus>(`${LIKE_API}/v1/article-likes/articles/${articleId}/users/${guestUserId}`),
         ]);
         if (cancelled) return;
         if (viewResult.status === "fulfilled") setViewCount(viewResult.value);
-        if (likedResult.status === "fulfilled") setLiked(likedResult.value.ok);
+        if (likedResult.status === "fulfilled") setLiked(likedResult.value.liked);
         if (commentsResult.status === "rejected") setComments([]);
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : "게시글을 불러오지 못했습니다.");
@@ -74,7 +84,7 @@ export function ArticleDetailPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, [articleId, loadComments]);
+  }, [articleId, guestUserId, loadComments]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,13 +111,13 @@ export function ArticleDetailPage() {
   }, [articleId]);
 
   async function toggleLike() {
-    if (isWorking) return;
+    if (isWorking || !guestUserId) return;
     const nextLiked = !liked;
     setLiked(nextLiked);
     setLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
     setIsWorking(true);
     try {
-      await requestJson<void>(`${LIKE_API}/v1/article-likes/articles/${articleId}/users/${LOCAL_USER_ID}/optimistic-lock`, {
+      await requestJson<void>(`${LIKE_API}/v1/article-likes/articles/${articleId}/users/${guestUserId}/optimistic-lock`, {
         method: nextLiked ? "POST" : "DELETE",
       });
       setNotice(nextLiked ? "이 이야기를 좋아합니다." : "좋아요를 취소했습니다.");
@@ -127,12 +137,13 @@ export function ArticleDetailPage() {
       setNotice("댓글을 두 글자 이상 입력해 주세요.");
       return;
     }
+    if (!guestUserId) return;
     setIsWorking(true);
     try {
       await requestJson<Comment>(`${COMMENT_API}/v2/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleId, content, writerId: LOCAL_USER_ID }),
+        body: JSON.stringify({ articleId, content, writerId: guestUserId }),
       });
       setComment("");
       await loadComments();
@@ -217,14 +228,14 @@ export function ArticleDetailPage() {
                 </button>
                 <span>◌ 댓글 {commentCount.toLocaleString("ko-KR")}</span>
                 <span>◎ 읽음 {viewCount.toLocaleString("ko-KR")}</span>
-                {article.writerId === LOCAL_USER_ID && <button className="delete-link" type="button" onClick={deleteArticle} disabled={isWorking}>글 삭제</button>}
+                {article.writerId === guestUserId && <button className="delete-link" type="button" onClick={deleteArticle} disabled={isWorking}>글 삭제</button>}
               </div>
             </article>
 
             <section className="comments-card" aria-labelledby="comments-title">
               <div className="comments-heading"><div><p className="section-kicker">CONVERSATION</p><h2 id="comments-title">댓글 {commentCount}</h2></div></div>
               <form className="comment-form" onSubmit={submitComment}>
-                <span className="comment-avatar" aria-hidden="true">YW</span>
+                <span className="comment-avatar guest-avatar" aria-hidden="true">G</span>
                 <label>
                   <span className="sr-only">댓글 내용</span>
                   <textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={3} maxLength={1000} placeholder="이야기에 따뜻한 댓글을 남겨보세요" />
@@ -235,9 +246,9 @@ export function ArticleDetailPage() {
               <div className="comment-list">
                 {comments.map((item) => (
                   <article className="comment-item" key={item.commentId}>
-                    <span className="comment-avatar" aria-hidden="true">{item.writerId === LOCAL_USER_ID ? "YW" : `M${item.writerId.slice(-2)}`}</span>
+                    <span className="comment-avatar" aria-hidden="true">{item.writerId === guestUserId ? "G" : `M${item.writerId.slice(-2)}`}</span>
                     <div><div className="comment-meta"><strong>modu_{item.writerId}</strong><time>{publishedAt(item.createdAt)}</time></div><p>{item.deleted ? "삭제된 댓글입니다." : item.content}</p></div>
-                    {!item.deleted && item.writerId === LOCAL_USER_ID && <button type="button" onClick={() => deleteComment(item.commentId)} disabled={isWorking}>삭제</button>}
+                    {!item.deleted && item.writerId === guestUserId && <button type="button" onClick={() => deleteComment(item.commentId)} disabled={isWorking}>삭제</button>}
                   </article>
                 ))}
                 {!comments.length && <div className="empty-comments"><strong>첫 댓글을 기다리고 있어요.</strong><span>이 이야기에 가장 먼저 마음을 건네보세요.</span></div>}

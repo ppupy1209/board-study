@@ -26,6 +26,20 @@ public class ArticleReadResponse {
     private Long articleViewCount;
 
     public static ArticleReadResponse from(ArticleQueryModel articleQueryModel, Long viewCount) {
+        return from(
+                articleQueryModel,
+                articleQueryModel.getArticleCommentCount(),
+                articleQueryModel.getArticleLikeCount(),
+                viewCount
+        );
+    }
+
+    public static ArticleReadResponse from(
+            ArticleQueryModel articleQueryModel,
+            Long commentCount,
+            Long likeCount,
+            Long viewCount
+    ) {
         ArticleReadResponse response = new ArticleReadResponse();
         response.articleId = articleQueryModel.getArticleId();
         response.title = articleQueryModel.getTitle();
@@ -34,8 +48,8 @@ public class ArticleReadResponse {
         response.writerId = articleQueryModel.getWriterId();
         response.createdAt = articleQueryModel.getCreatedAt();
         response.modifiedAt = articleQueryModel.getModifiedAt();
-        response.articleCommentCount = articleQueryModel.getArticleCommentCount();
-        response.articleLikeCount = articleQueryModel.getArticleLikeCount();
+        response.articleCommentCount = commentCount;
+        response.articleLikeCount = likeCount;
         response.articleViewCount = viewCount;
         return response;
     }
