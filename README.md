@@ -24,6 +24,28 @@ Modu Square는 오늘의 생각을 나누고, 다른 사람의 취향과 질문�
 
 좋아요, 댓글, 조회수를 모아 오늘의 인기글 Top 10을 보여줍니다. 
 
+## 아키텍처
+
+<img width="858" height="324" alt="Modu Square 서비스 아키텍처" src="https://github.com/user-attachments/assets/1b52ed8c-9a59-455d-82e2-e61e8e3c39f8" />
+
+게시글, 댓글, 좋아요, 조회 도메인을 서비스별로 분리하고 Kafka 이벤트로 연결했습니다. 각 도메인 서비스가 상태 변경 이벤트를 발행하면 게시글 조회 서비스와 인기글 서비스가 이를 구독해 각자의 조회 모델을 갱신합니다. 서비스 간 직접 호출을 줄여 기능별로 독립적으로 확장하고 장애 영향을 분리할 수 있도록 구성했습니다.
+
+## Transactional Outbox Pattern
+
+MySQL의 비즈니스 데이터 저장과 Kafka 이벤트 발행은 서로 다른 시스템에서 실행되므로 하나의 트랜잭션으로 묶을 수 없습니다. DB 저장만 성공하거나 Kafka 이벤트만 먼저 전달되면 서비스 간 데이터가 어긋날 수 있습니다. 이를 막기 위해 비즈니스 데이터와 이벤트를 같은 MySQL 트랜잭션의 Outbox에 저장합니다. 커밋이 끝난 뒤 Kafka로 발행하며 전송에 성공한 이벤트만 삭제합니다. 실패한 이벤트는 DB에 남겨 스케줄러가 다시 발행합니다.
+
+- [MessageRelay.java에서 구현 보기](https://github.com/ppupy1209/modu-square/blob/main/common/outbox-message-relay/src/main/java/board/common/outboxmessagerelay/MessageRelay.java)
+
+## 삭제된 게시글 반복 조회
+
+### 문제
+
+인기글이 삭제된 뒤에도 검색 결과와 공유 링크 등에 기존 URL이 남아 있으면 같은 게시글 ID에 조회가 반복될 수 있다고 생각했습니다. Redis는 캐시 미스와 실제 게시글 부재를 구분하지 못하므로 요청마다 게시글 서비스와 MySQL을 다시 조회합니다. 이 상황이 계속되면 존재하지 않는 게시글을 확인하는 요청이 원본 서비스와 DB의 처리량을 차지하고 정상 게시글 조회까지 지연시킬 수 있습니다.
+
+### 해결
+
+게시글 서비스에서 404 응답을 받은 게시글 ID는 Redis에 `MISSING` 값으로 60초 동안 저장했습니다. 캐시가 만들어지기 전에는 Redis `SET NX` 잠금으로 한 요청만 게시글 서비스를 조회하고 나머지는 결과를 기다리게 했습니다. 타임아웃과 5xx는 캐시하지 않아 게시글 서비스의 장애를 게시글 부재로 오인하지 않도록 했습니다.
+
 ## 로컬 실행
 
 Git과 Docker Desktop이 필요합니다. Docker Desktop을 먼저 실행한 뒤 아래 순서대로 진행하세요.
