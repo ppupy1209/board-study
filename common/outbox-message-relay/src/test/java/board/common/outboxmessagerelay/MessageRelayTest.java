@@ -20,7 +20,6 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -39,8 +38,6 @@ class MessageRelayTest {
     @Mock
     private OutboxRepository outboxRepository;
     @Mock
-    private MessageRelayCoordinator messageRelayCoordinator;
-    @Mock
     private KafkaTemplate<String, String> messageRelayKafkaTemplate;
 
     private MeterRegistry meterRegistry;
@@ -51,7 +48,6 @@ class MessageRelayTest {
         meterRegistry = new SimpleMeterRegistry();
         messageRelay = new MessageRelay(
                 outboxRepository,
-                messageRelayCoordinator,
                 messageRelayKafkaTemplate,
                 new MessageRelayMetrics(meterRegistry)
         );
@@ -139,10 +135,9 @@ class MessageRelayTest {
         verify(outboxRepository, never()).delete(any());
 
         // 2회차: 재시도 스케줄러가 남은 Outbox를 집어 다시 전송하고, 이번엔 성공한다
-        when(messageRelayCoordinator.assignedShards()).thenReturn(AssignedShard.of("app", List.of("app"), 4));
-        when(outboxRepository.findAllByShardKeyAndCreatedAtLessThanEqualOrderByCreatedAtAsc(
-                anyLong(), any(LocalDateTime.class), any(Pageable.class)))
-                .thenReturn(List.of(outbox), List.of(), List.of(), List.of());
+        when(outboxRepository.findAllByCreatedAtLessThanEqualOrderByCreatedAtAsc(
+                any(LocalDateTime.class), any(Pageable.class)))
+                .thenReturn(List.of(outbox));
         givenKafkaSendSucceeds();
 
         messageRelay.publishPendingEvent();

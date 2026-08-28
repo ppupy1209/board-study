@@ -11,8 +11,7 @@ import java.util.Optional;
 @Repository
 public interface OutboxRepository extends JpaRepository<Outbox, Long> {
 
-    List<Outbox> findAllByShardKeyAndCreatedAtLessThanEqualOrderByCreatedAtAsc(
-            Long shardKey,
+    List<Outbox> findAllByCreatedAtLessThanEqualOrderByCreatedAtAsc(
             LocalDateTime from,
             Pageable pageable
     );
