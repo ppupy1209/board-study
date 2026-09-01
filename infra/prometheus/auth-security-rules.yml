@@ -1,0 +1,12 @@
+groups:
+  - name: auth-security
+    rules:
+      - alert: RefreshTokenReuseDetected
+        expr: increase(auth_refresh_reuse_detected_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: auth
+        annotations:
+          summary: "Refresh Token 재사용 감지"
+          description: "최근 5분 동안 폐기된 Refresh Token이 다시 제출되었습니다. 해당 토큰 패밀리는 자동 폐기됐으며 계정 탈취 가능성을 확인해야 합니다."

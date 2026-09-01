@@ -50,7 +50,7 @@ services:
     image: mysql:8.4
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - mysql -hmysql -uroot -proot < /migrations/02-media.sql && mysql -hmysql -uroot -proot < /migrations/03-community-data.sql && mysql -hmysql -uroot -proot < /migrations/04-product-board.sql && mysql -hmysql -uroot -proot < /migrations/05-initial-comment-time.sql && mysql -hmysql -uroot -proot < /migrations/06-community-like-consistency.sql
+      - mysql -hmysql -uroot -proot < /migrations/02-media.sql && mysql -hmysql -uroot -proot < /migrations/03-community-data.sql && mysql -hmysql -uroot -proot < /migrations/04-product-board.sql && mysql -hmysql -uroot -proot < /migrations/05-initial-comment-time.sql && mysql -hmysql -uroot -proot < /migrations/06-community-like-consistency.sql && mysql -hmysql -uroot -proot < /migrations/07-auth.sql
     volumes:
       - ./infra/mysql/migrations:/migrations:ro
     depends_on:
@@ -292,6 +292,26 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  auth:
+    build:
+      context: .
+      args: { SERVICE: auth }
+    mem_limit: 448m
+    environment:
+      <<: *service-environment
+      DB_URL: jdbc:mysql://mysql:3306/auth
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-modu-square-local-jwt-secret-change-me-2026}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+    ports: ["9008:9008"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      media-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   web:
     build: ./web
     environment:
@@ -303,6 +323,7 @@ services:
       NEXT_PUBLIC_HOT_ARTICLE_API_BASE_URL: http://localhost:9004
       NEXT_PUBLIC_NOTIFICATION_API_BASE_URL: http://localhost:9006
       NEXT_PUBLIC_MEDIA_API_BASE_URL: http://localhost:9007
+      NEXT_PUBLIC_AUTH_API_BASE_URL: http://localhost:9008
     ports: ["${WEB_PORT:-3000}:3000"]
     depends_on:
       article:
@@ -321,6 +342,8 @@ services:
         condition: service_started
       media:
         condition: service_started
+      auth:
+        condition: service_started
     restart: unless-stopped
 
   prometheus:
@@ -333,6 +356,7 @@ services:
     ports: ["9090:9090"]
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/auth-security-rules.yml:/etc/prometheus/auth-security-rules.yml:ro
       - prometheus-data:/prometheus
     depends_on:
       - article
@@ -343,6 +367,7 @@ services:
       - article-read
       - notification
       - media
+      - auth
 
   mysql-exporter:
     image: prom/mysqld-exporter:v0.15.1
@@ -434,6 +459,7 @@ services:
       ARTICLE_READ_URL: http://article-read:9005
       NOTIFICATION_URL: http://notification:9006
       MEDIA_URL: http://media:9007
+      AUTH_URL: http://auth:9008
       TEST_ID: ${TEST_ID:-}
       TEST_TYPE: ${TEST_TYPE:-}
       DATASET: ${DATASET:-15000100}

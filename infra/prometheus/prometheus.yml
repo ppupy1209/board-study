@@ -2,6 +2,9 @@ global:
   scrape_interval: 10s
   evaluation_interval: 10s
 
+rule_files:
+  - /etc/prometheus/auth-security-rules.yml
+
 scrape_configs:
   - job_name: modu-square-services
     metrics_path: /actuator/prometheus
@@ -15,6 +18,7 @@ scrape_configs:
           - article-read:9005
           - notification:9006
           - media:9007
+          - auth:9008
 
   - job_name: modu-square-mysql
     static_configs:

@@ -1,0 +1,52 @@
+server:
+  port: 9008
+  shutdown: graceful
+  tomcat:
+    mbeanregistry:
+      enabled: true
+
+spring:
+  application:
+    name: modu-square-auth-service
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3307/auth}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+
+auth:
+  token:
+    issuer: modu-square-auth
+    secret: ${AUTH_JWT_SECRET:modu-square-local-jwt-secret-change-me-2026}
+    access-token-ttl: 5m
+    refresh-token-ttl: 14d
+  cookie:
+    name: MODU_REFRESH
+    secure: ${AUTH_COOKIE_SECURE:false}
+    same-site: Strict
+    path: /v1/auth
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      service: ${spring.application.name}

@@ -1,0 +1,16 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create
+
+auth:
+  token:
+    issuer: modu-square-auth-test
+    secret: modu-square-test-jwt-secret-at-least-32-bytes
+    access-token-ttl: 5m
+    refresh-token-ttl: 14d
+  cookie:
+    name: MODU_REFRESH
+    secure: false
+    same-site: Strict
+    path: /v1/auth

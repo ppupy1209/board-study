@@ -11,7 +11,7 @@
 ### 결정
 
 - 다양한 주제로 자유롭게 소통한다는 의미가 바로 드러나도록 제품 이름을 `모두의 광장`으로 정하고 자유게시판, 오늘의 인기 흐름, 시스템 상태를 한 화면에 배치했습니다.
-- Docker Compose 한 번으로 UI, 6개 Spring 서비스, MySQL, Redis, Kafka, Prometheus, Grafana를 시작합니다.
+- Docker Compose 한 번으로 UI, 9개 Spring 서비스, MySQL, Redis, Kafka, Prometheus, Grafana를 시작합니다.
 - 기본 실행은 자유게시판의 100건 데모 데이터만 제공해 빠르게 시작합니다. 1,500만 건은 `large-data` 프로필로 최초 한 번만 로컬 MySQL 볼륨에 적재하고 이후 실행에서는 재사용합니다.
 
 ### 트레이드오프
@@ -178,10 +178,29 @@ at-least-once는 중복을 허용합니다. 따라서 Consumer는 이벤트 ID�
 
 수치는 합격을 보장하는 장식이 아니라, 로컬 환경에서 회귀를 발견하기 위한 출발점입니다. 실제 결과는 CPU, 메모리, 디스크와 적재 완료 여부를 함께 기록해야 비교할 수 있습니다.
 
-## 11. 다음 개선
+## 11. 로그아웃 뒤에도 살아남는 Refresh Token 재사용 차단
+
+### 문제
+
+Access Token을 5분으로 줄이면서 Refresh Token을 도입했지만, 브라우저 쿠키만 지우는 로그아웃으로는 공격자가 미리 복사한 Token을 없앨 수 없었습니다. 같은 Token이 동시에 두 번 갱신되면 정상 재시도와 탈취 요청을 구분할 수도 없었습니다.
+
+### 선택과 해결
+
+- 고정 Refresh Token과 모든 요청의 세션 조회 대신 Refresh Token Rotation과 Token Family를 선택했습니다.
+- Token 원문은 `HttpOnly` 쿠키로만 전달하고 DB에는 SHA-256 해시와 `ACTIVE → ROTATED → REVOKED` 상태만 저장했습니다.
+- 같은 Token의 갱신은 비관적 행 잠금으로 한 건만 성공시켰습니다.
+- 회전된 이전 Token이 다시 나타나면 신규 Token을 포함한 패밀리 전체를 폐기했습니다.
+- 보안 상태 변경이 401 예외와 함께 롤백되지 않도록 재사용 탐지 트랜잭션의 커밋 경계를 분리했습니다.
+- 재사용 탐지 Counter와 Prometheus 경보를 추가했습니다.
+
+### 검증과 한계
+
+Testcontainers MySQL 동시성 테스트 3건과 k6 실제 HTTP 재현을 통과했습니다. Guest 조회 흐름은 그대로 유지했습니다. 재사용을 감지해도 이미 발급된 Access Token은 최대 5분간 유효하며, 즉시 차단을 위해 모든 서비스가 세션 상태에 의존하는 비용은 이번에는 수용하지 않았습니다. 선택지, 상태 전이, 지표와 공격 재현은 [Refresh Token 재사용 차단 기록](refresh-token-replay.md)에 정리했습니다.
+
+## 12. 다음 개선
 
 - Query Model 전체 재구축과 체크포인트
 - Kafka 파티션 확대 시 key ordering 검증
-- Testcontainers 기반 통합 테스트
+- OAuth2/OIDC 공급자 연동과 가짜 OIDC 서버 기반 callback 통합 테스트
 - 실제 k6 결과를 CI artifact로 저장하고 이전 기준선과 비교
 - UI의 글쓰기·댓글·좋아요 흐름을 API와 완전 연결

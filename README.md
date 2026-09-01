@@ -46,6 +46,12 @@ MySQL의 비즈니스 데이터 저장과 Kafka 이벤트 발행은 서로 다�
 
 게시글 서비스에서 404 응답을 받은 게시글 ID는 Redis에 `MISSING` 값으로 60초 동안 저장했습니다. 타임아웃과 5xx는 캐시하지 않아 게시글 서비스의 장애를 게시글 부재로 오인하지 않도록 했습니다.
 
+## Refresh Token 재사용 탐지
+
+짧은 Access Token과 긴 Refresh Token을 함께 사용할 때, 쿠키 삭제만으로는 이미 탈취된 Refresh Token을 종료할 수 없습니다. 로그인마다 Token Family를 만들고 갱신할 때마다 Refresh Token을 회전합니다. 회전된 이전 Token이 다시 제출되면 동일 패밀리의 신규 Token까지 모두 폐기하고 Prometheus 경보를 발생시킵니다.
+
+- [문제 재현, 선택지와 동시성 검증 기록](docs/refresh-token-replay.md)
+
 ## 로컬 실행
 
 Git과 Docker Desktop이 필요합니다. Docker Desktop을 먼저 실행한 뒤 아래 순서대로 진행하세요.
@@ -69,7 +75,13 @@ docker compose up --build -d
 docker compose ps
 ```
 
-준비가 끝나면 브라우저에서 `http://localhost:3000`을 여세요. 첫 실행에는 주제별 게시글과 댓글, 좋아요, 조회수, 인기글 데이터가 함께 들어갑니다. 가입하거나 데이터를 직접 만들지 않아도 주요 기능을 바로 둘러볼 수 있습니다.
+준비가 끝나면 브라우저에서 `http://localhost:3000`을 여세요. 첫 실행에는 주제별 게시글과 댓글, 좋아요, 조회수, 인기글 데이터가 함께 들어갑니다. Auth Service도 함께 실행되지만 기존 조회·체험 API에는 로그인을 강제하지 않으므로, 가입하거나 데이터를 직접 만들지 않아도 Guest로 주요 기능을 바로 둘러볼 수 있습니다.
+
+Refresh Token 재사용 방어 시나리오는 다음 명령으로 별도 재현할 수 있습니다.
+
+```bash
+docker compose run --rm --no-deps k6 run /scripts/auth-refresh-replay.js
+```
 
 ### 3. 서비스 종료하기
 
