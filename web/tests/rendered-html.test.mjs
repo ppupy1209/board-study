@@ -115,6 +115,8 @@ test("keeps accessibility, navigation, authentication, and social preview contra
   assert.doesNotMatch(chrome, /YW|\/#community/);
   assert.match(authPage, /registerMember/);
   assert.match(authPage, /loginMember/);
+  assert.match(authPage, /window\.location\.replace\("\/"\)/);
+  assert.doesNotMatch(authPage, /useRouter/);
   assert.match(authPage, /minLength=\{mode === "register" \? 10 : undefined\}/);
   assert.match(authApi, /credentials: "include"/);
   assert.match(authApi, /window\.sessionStorage/);

@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import { CommunityFooter, CommunityHeader } from "../CommunityChrome";
 import { AuthRequestError, loginMember, registerMember } from "../../lib/auth-api";
 
 type AuthMode = "login" | "register";
 
 export function AuthPage() {
-  const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,8 +44,7 @@ export function AuthPage() {
       }
 
       await loginMember({ email, password });
-      router.replace("/");
-      router.refresh();
+      window.location.replace("/");
     } catch (cause) {
       if (cause instanceof AuthRequestError) {
         setErrorMessage(cause.message);
