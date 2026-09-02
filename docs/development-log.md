@@ -195,7 +195,7 @@ Access Token을 5분으로 줄이면서 Refresh Token을 도입했지만, 브라
 
 ### 검증과 한계
 
-Testcontainers MySQL 동시성 테스트 3건과 k6 실제 HTTP 재현을 통과했습니다. Guest 조회 흐름은 그대로 유지했습니다. 재사용을 감지해도 이미 발급된 Access Token은 최대 5분간 유효하며, 즉시 차단을 위해 모든 서비스가 세션 상태에 의존하는 비용은 이번에는 수용하지 않았습니다. 선택지, 상태 전이, 지표와 공격 재현은 [Refresh Token 재사용 차단 기록](refresh-token-replay.md)에 정리했습니다.
+Testcontainers MySQL 동시성 테스트 3건과 k6 실제 HTTP 재현을 통과했습니다. Guest 조회·글쓰기 흐름은 그대로 유지하면서, 로그인 사용자의 새 글만 Access Token의 회원 ID와 닉네임에 연결했습니다. 기존 게시글은 별도 갱신 없이 `modu_{writerId}` 표시를 유지합니다. 재사용을 감지해도 이미 발급된 Access Token은 최대 5분간 유효하며, 즉시 차단을 위해 모든 서비스가 세션 상태에 의존하는 비용은 이번에는 수용하지 않았습니다. 선택지, 상태 전이, 지표와 공격 재현은 [Refresh Token 재사용 차단 기록](refresh-token-replay.md)에 정리했습니다.
 
 ## 12. 다음 개선
 

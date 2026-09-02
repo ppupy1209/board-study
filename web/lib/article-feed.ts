@@ -15,12 +15,17 @@ export function withTags(articles: Article[]) {
   return articles.map((article) => ({ ...article, tag: articleTag(article) }));
 }
 
+export function articleWriterName(article: Article) {
+  const nickname = article.writerNickname?.trim();
+  return article.writerType === "MEMBER" && nickname ? nickname : `modu_${article.writerId}`;
+}
+
 export function filterArticles(articles: Article[], category: string, query: string) {
   const normalized = query.trim().toLowerCase();
   return articles.filter((article) => {
     const inCategory = category === "전체" || article.tag === category;
     const inQuery = !normalized
-      || `${article.title} ${article.content} modu_${article.writerId}`.toLowerCase().includes(normalized);
+      || `${article.title} ${article.content} ${articleWriterName(article)} modu_${article.writerId}`.toLowerCase().includes(normalized);
     return inCategory && inQuery;
   });
 }

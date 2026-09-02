@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS article.article (
   KEY idx_article_board_id_article_id (board_id, article_id DESC)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS article.article_writer (
+  article_id BIGINT NOT NULL,
+  writer_type VARCHAR(10) NOT NULL,
+  writer_nickname VARCHAR(40) NOT NULL,
+  PRIMARY KEY (article_id),
+  CONSTRAINT fk_article_writer_article
+    FOREIGN KEY (article_id) REFERENCES article.article (article_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS article.board_article_count (
   board_id BIGINT NOT NULL,
   article_count BIGINT NOT NULL,

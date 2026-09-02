@@ -13,6 +13,8 @@ public class ArticleQueryModel {
     private String content;
     private Long boardId;
     private Long writerId;
+    private String writerType;
+    private String writerNickname;
     private LocalDateTime createdAt;
     private LocalDateTime modifiedAt;
     private Long articleCommentCount;
@@ -25,6 +27,8 @@ public class ArticleQueryModel {
         model.content = payload.getContent();
         model.boardId = payload.getBoardId();
         model.writerId = payload.getWriterId();
+        model.writerType = payload.getWriterType();
+        model.writerNickname = payload.getWriterNickname();
         model.createdAt = payload.getCreatedAt();
         model.modifiedAt = payload.getModifiedAt();
         model.articleCommentCount = 0L;
@@ -39,6 +43,8 @@ public class ArticleQueryModel {
         model.content = article.getContent();
         model.boardId = article.getBoardId();
         model.writerId = article.getWriterId();
+        model.writerType = article.getWriterType();
+        model.writerNickname = article.getWriterNickname();
         model.createdAt = article.getCreatedAt();
         model.modifiedAt = article.getModifiedAt();
         model.articleCommentCount = commentCount;
@@ -67,6 +73,8 @@ public class ArticleQueryModel {
         this.content = payload.getContent();
         this.boardId = payload.getBoardId();
         this.writerId = payload.getWriterId();
+        this.writerType = payload.getWriterType();
+        this.writerNickname = payload.getWriterNickname();
         this.createdAt = payload.getCreatedAt();
         this.modifiedAt = payload.getModifiedAt();
     }

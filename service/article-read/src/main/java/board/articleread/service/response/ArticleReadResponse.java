@@ -19,6 +19,8 @@ public class ArticleReadResponse {
     private Long boardId;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long writerId;
+    private String writerType;
+    private String writerNickname;
     private LocalDateTime createdAt;
     private LocalDateTime modifiedAt;
     private Long articleCommentCount;
@@ -46,6 +48,8 @@ public class ArticleReadResponse {
         response.content = articleQueryModel.getContent();
         response.boardId = articleQueryModel.getBoardId();
         response.writerId = articleQueryModel.getWriterId();
+        response.writerType = articleQueryModel.getWriterType();
+        response.writerNickname = articleQueryModel.getWriterNickname();
         response.createdAt = articleQueryModel.getCreatedAt();
         response.modifiedAt = articleQueryModel.getModifiedAt();
         response.articleCommentCount = commentCount;

@@ -27,6 +27,7 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [guestUserId, setGuestUserId] = useState("");
   const [authMember, setAuthMember] = useState<AuthMember | null>(null);
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [accountError, setAccountError] = useState("");
@@ -35,11 +36,33 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
   useEffect(() => {
     const identity = getOrCreateGuestIdentity();
     const restoreGuest = window.setTimeout(() => setGuestUserId(identity.userId), 0);
+    return () => {
+      window.clearTimeout(restoreGuest);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    restoreAuthMember().then((member) => {
+      if (active) {
+        setAuthMember(member);
+        setIsAuthResolved(true);
+      }
+    });
+    return () => { active = false; };
+  }, []);
+
+  const notificationUserId = authMember
+    ? String(authMember.memberId)
+    : isAuthResolved ? guestUserId : "";
+
+  useEffect(() => {
+    if (!notificationUserId) return;
     const controller = new AbortController();
 
     async function loadNotifications() {
       try {
-        const response = await fetch(`${NOTIFICATION_API}/v1/notifications/users/${identity.userId}?limit=10`, {
+        const response = await fetch(`${NOTIFICATION_API}/v1/notifications/users/${notificationUserId}?limit=10`, {
           signal: controller.signal,
         });
         if (!response.ok) return;
@@ -53,19 +76,10 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
     loadNotifications();
     const intervalId = window.setInterval(loadNotifications, 30_000);
     return () => {
-      window.clearTimeout(restoreGuest);
       window.clearInterval(intervalId);
       controller.abort();
     };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    restoreAuthMember().then((member) => {
-      if (active) setAuthMember(member);
-    });
-    return () => { active = false; };
-  }, []);
+  }, [notificationUserId]);
 
   const totalEventCount = notifications.reduce((sum, notification) => sum + notification.eventCount, 0);
   const notificationBadge = totalEventCount > 99 ? "99+" : String(totalEventCount);
@@ -87,6 +101,7 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
     try {
       await logoutMember();
       setAuthMember(null);
+      setNotifications([]);
       setIsAccountOpen(false);
     } catch {
       setAccountError("로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.");

@@ -16,6 +16,8 @@ public class ArticleCreatedEventPayload implements EventPayload {
     private String content;
     private Long boardId;
     private Long writerId;
+    private String writerType;
+    private String writerNickname;
     private LocalDateTime createdAt;
     private LocalDateTime modifiedAt;
     private Long boardArticleCount;

@@ -20,6 +20,8 @@ import {
   publishedAt,
   requestJson,
 } from "../../../lib/community-api";
+import { articleWriterName } from "../../../lib/article-feed";
+import { restoreAuthMember } from "../../../lib/auth-api";
 
 type CommentPageResponse = { comments: Comment[]; commentCount: number };
 
@@ -40,12 +42,21 @@ export function ArticleDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
   const [guestUserId, setGuestUserId] = useState("");
+  const [memberId, setMemberId] = useState<number | null>(null);
 
   useEffect(() => {
     const restoreGuest = window.setTimeout(() => {
       setGuestUserId(getOrCreateGuestIdentity().userId);
     }, 0);
     return () => window.clearTimeout(restoreGuest);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    restoreAuthMember().then((member) => {
+      if (active) setMemberId(member?.memberId ?? null);
+    });
+    return () => { active = false; };
   }, []);
 
   const loadComments = useCallback(async () => {
@@ -190,7 +201,7 @@ export function ArticleDetailPage() {
         {!isLoading && article && (
           <>
             <article className="detail-card">
-              <div className="detail-meta"><span>자유게시판</span><span>modu_{article.writerId}</span><span>·</span><time>{publishedAt(article.createdAt)}</time></div>
+              <div className="detail-meta"><span>자유게시판</span><span>{articleWriterName(article)}</span><span>·</span><time>{publishedAt(article.createdAt)}</time></div>
               <h1>{article.title}</h1>
               <p className="detail-content">{article.content}</p>
               {media.length > 0 && (
@@ -228,7 +239,9 @@ export function ArticleDetailPage() {
                 </button>
                 <span>◌ 댓글 {commentCount.toLocaleString("ko-KR")}</span>
                 <span>◎ 읽음 {viewCount.toLocaleString("ko-KR")}</span>
-                {article.writerId === guestUserId && <button className="delete-link" type="button" onClick={deleteArticle} disabled={isWorking}>글 삭제</button>}
+                {(article.writerId === guestUserId || (article.writerType === "MEMBER" && article.writerId === String(memberId))) && (
+                  <button className="delete-link" type="button" onClick={deleteArticle} disabled={isWorking}>글 삭제</button>
+                )}
               </div>
             </article>
 

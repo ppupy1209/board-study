@@ -105,5 +105,5 @@ docker compose --profile loadtest run --rm \
 
 - 로컬 MinIO로 Object Storage를 재현한 결과이며 실제 CDN·클라우드 요금 절감액을 측정한 것은 아님
 - 현재 조회 경로는 Object Storage 공개 URL 사용. 운영 환경에서는 CDN 도메인, 서명 정책, 원본 접근 제한 추가 필요
-- 현재 프로젝트에는 사용자 인증이 없으므로 운영 환경에서는 업로드 소유권과 게시글 연결 권한 검증 추가 필요
+- 게시글 작성자는 인증 정보와 연결했지만 Media Service는 아직 업로드 소유권을 검증하지 않으므로 운영 환경에서는 게시글 연결 권한 검증 추가 필요
 - WebP 처리량이 증가할 경우 Kafka 파티션과 Worker 확장, 실패 이벤트 격리, 처리 지연 알림 보완 필요

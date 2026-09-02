@@ -27,6 +27,13 @@ type AccessTokenResponse = {
   expiresInSeconds: number;
 };
 
+type RestoredAuthSession = {
+  member: AuthMember;
+  accessToken: string;
+};
+
+let restoreSessionPromise: Promise<RestoredAuthSession | null> | null = null;
+
 type AuthErrorPayload = {
   code?: string;
   message?: string;
@@ -119,11 +126,11 @@ export async function loginMember(input: LoginMemberInput) {
   return currentMember(session.accessToken);
 }
 
-export async function restoreAuthMember(): Promise<AuthMember | null> {
+async function restoreAuthSessionOnce(): Promise<RestoredAuthSession | null> {
   const accessToken = storedAccessToken();
   if (accessToken) {
     try {
-      return await currentMember(accessToken);
+      return { member: await currentMember(accessToken), accessToken };
     } catch (cause) {
       if (!(cause instanceof AuthRequestError) || cause.status !== 401) return null;
       removeAccessToken();
@@ -137,11 +144,31 @@ export async function restoreAuthMember(): Promise<AuthMember | null> {
   try {
     const session = await refreshAccessToken();
     storeAccessToken(session.accessToken);
-    return await currentMember(session.accessToken);
+    return {
+      member: await currentMember(session.accessToken),
+      accessToken: session.accessToken,
+    };
   } catch (cause) {
     if (cause instanceof AuthRequestError) clearStoredSession();
     return null;
   }
+}
+
+async function restoreAuthSession() {
+  if (!restoreSessionPromise) {
+    restoreSessionPromise = restoreAuthSessionOnce().finally(() => {
+      restoreSessionPromise = null;
+    });
+  }
+  return restoreSessionPromise;
+}
+
+export async function restoreAuthMember(): Promise<AuthMember | null> {
+  return (await restoreAuthSession())?.member ?? null;
+}
+
+export async function getAuthAccessToken(): Promise<string | null> {
+  return (await restoreAuthSession())?.accessToken ?? null;
 }
 
 export async function logoutMember() {

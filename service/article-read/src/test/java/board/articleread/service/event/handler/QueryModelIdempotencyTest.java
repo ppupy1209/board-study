@@ -64,6 +64,29 @@ class QueryModelIdempotencyTest {
     }
 
     @Test
+    @DisplayName("회원 작성자 메타데이터를 조회 모델에 보존한다")
+    void keepsMemberWriterMetadata() {
+        ArticleQueryModel queryModel = ArticleQueryModel.create(
+                ArticleCreatedEventPayload.builder()
+                        .articleId(ARTICLE_ID)
+                        .title("title")
+                        .content("content")
+                        .boardId(1L)
+                        .writerId(42L)
+                        .writerType("MEMBER")
+                        .writerNickname("연우")
+                        .createdAt(LocalDateTime.now())
+                        .modifiedAt(LocalDateTime.now())
+                        .boardArticleCount(1L)
+                        .build()
+        );
+
+        assertThat(queryModel.getWriterId()).isEqualTo(42L);
+        assertThat(queryModel.getWriterType()).isEqualTo("MEMBER");
+        assertThat(queryModel.getWriterNickname()).isEqualTo("연우");
+    }
+
+    @Test
     @DisplayName("같은 좋아요 이벤트를 두 번 소비해도 좋아요 수가 중복 반영되지 않는다")
     void likedEventIsIdempotent() {
         ArticleQueryModel queryModel = newQueryModel();

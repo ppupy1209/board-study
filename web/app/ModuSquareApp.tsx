@@ -15,6 +15,7 @@ import {
 } from "../lib/community-api";
 import {
   ARTICLE_CATEGORIES,
+  articleWriterName,
   filterArticles,
   paginateArticles,
   paginationItems,
@@ -258,7 +259,7 @@ export function ModuSquareApp() {
                     <strong>{formatCompact(article.articleLikeCount)}</strong>
                   </button>
                   <Link className="article-body article-link" href={`/articles/${article.articleId}`}>
-                    <div className="article-meta"><span className={`tag tag-${index % 5}`}>{article.tag ?? "이야기"}</span><span>modu_{article.writerId}</span><time>{publishedAt(article.createdAt)}</time></div>
+                    <div className="article-meta"><span className={`tag tag-${index % 5}`}>{article.tag ?? "이야기"}</span><span>{articleWriterName(article)}</span><time>{publishedAt(article.createdAt)}</time></div>
                     <h3>{article.title}</h3>
                     <p>{article.content}</p>
                     <div className="article-stats"><span>◌ {formatCompact(article.articleCommentCount)} 대화</span><span>◎ {formatCompact(article.articleViewCount)} 읽음</span></div>

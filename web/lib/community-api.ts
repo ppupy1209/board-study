@@ -15,6 +15,8 @@ export type Article = {
   title: string;
   content: string;
   writerId: string;
+  writerType?: "GUEST" | "MEMBER" | null;
+  writerNickname?: string | null;
   boardId?: string;
   createdAt: string;
   modifiedAt?: string;

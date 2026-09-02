@@ -83,10 +83,23 @@ test("paginates each topic from its own filtered articles", async () => {
   const invalidTravelPage = feed.paginateArticles(travelArticles, 2, 6);
   assert.equal(invalidTravelPage.currentPage, 1);
   assert.equal(invalidTravelPage.items.length, 3);
+
+  const legacyArticle = makeArticle(90, "기존 글");
+  const memberArticle = {
+    ...makeArticle(91, "회원 글"),
+    writerId: "42",
+    writerType: "MEMBER",
+    writerNickname: "연우",
+  };
+  assert.equal(feed.articleWriterName(legacyArticle), "modu_90");
+  assert.equal(feed.articleWriterName(memberArticle), "연우");
+  assert.deepEqual(feed.filterArticles(feed.withTags([legacyArticle, memberArticle]), "전체", "연우"), [
+    { ...memberArticle, tag: "일상" },
+  ]);
 });
 
 test("keeps accessibility, navigation, authentication, and social preview contracts", async () => {
-  const [page, community, chrome, detail, write, authPage, authApi, layout, css, packageJson, smallSeed, communityData, likeConsistency, largeSeed] = await Promise.all([
+  const [page, community, chrome, detail, write, authPage, authApi, articleFeed, layout, css, packageJson, smallSeed, writerMigration, compose, communityData, likeConsistency, largeSeed] = await Promise.all([
     readFile(new URL("../app/ModuSquareApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/community/CommunityArticlesPage.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/CommunityChrome.tsx", import.meta.url), "utf8"),
@@ -94,10 +107,13 @@ test("keeps accessibility, navigation, authentication, and social preview contra
     readFile(new URL("../app/write/WriteArticlePage.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/auth/AuthPage.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/auth-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/article-feed.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../../infra/mysql/init/01-schema.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../infra/mysql/migrations/08-article-writer.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../docker-compose.yml", import.meta.url), "utf8"),
     readFile(new URL("../../infra/mysql/migrations/03-community-data.sql", import.meta.url), "utf8"),
     readFile(new URL("../../infra/mysql/migrations/06-community-like-consistency.sql", import.meta.url), "utf8"),
     readFile(new URL("../../infra/mysql/seed/seed-articles.sh", import.meta.url), "utf8"),
@@ -122,6 +138,8 @@ test("keeps accessibility, navigation, authentication, and social preview contra
   assert.match(authApi, /window\.sessionStorage/);
   assert.match(authApi, /SESSION_HINT_STORAGE_KEY/);
   assert.match(authApi, /\/v1\/auth\/refresh/);
+  assert.match(authApi, /restoreSessionPromise/);
+  assert.match(authApi, /getAuthAccessToken/);
   assert.match(page, /href=\{`\/articles\/\$\{article\.articleId\}`\}/);
   assert.match(page, /popularArticles\.map/);
   assert.match(page, /fetchAllArticles/);
@@ -142,8 +160,13 @@ test("keeps accessibility, navigation, authentication, and social preview contra
   assert.match(css, /community-browser-intro h1[^}]*white-space:\s*nowrap/);
   assert.match(detail, /aria-pressed=\{liked\}/);
   assert.match(detail, /이야기를 불러오고 있어요/);
+  assert.match(detail, /articleWriterName/);
   assert.match(write, /<form className="editor-form"/);
   assert.match(write, /어떤 이야기를 나누고 싶나요/);
+  assert.match(write, /getAuthAccessToken/);
+  assert.match(write, /Authorization: `Bearer \$\{accessToken\}`/);
+  assert.match(articleFeed, /article\.writerType === "MEMBER"/);
+  assert.match(articleFeed, /`modu_\$\{article\.writerId\}`/);
   assert.match(page, /role="status"/);
   assert.match(layout, /\/og\.png/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
@@ -152,6 +175,12 @@ test("keeps accessibility, navigation, authentication, and social preview contra
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(smallSeed, /topic=|sequence=|THEN '[^']* #'/);
   assert.doesNotMatch(smallSeed, /8000000000000000/);
+  assert.match(smallSeed, /article\.article_writer/);
+  assert.match(writerMigration, /article\.article_writer/);
+  assert.match(writerMigration, /FOREIGN KEY \(article_id\)/i);
+  assert.doesNotMatch(writerMigration, /ALTER\s+TABLE\s+article\.article/i);
+  assert.doesNotMatch(writerMigration, /UPDATE\s+article\.article/i);
+  assert.match(compose, /08-article-writer\.sql/);
   assert.match(communityData, /article_like\.article_like/);
   assert.match(communityData, /comment\.comment_v2/);
   assert.match(communityData, /article_view\.article_view_count/);

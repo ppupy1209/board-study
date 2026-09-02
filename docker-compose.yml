@@ -50,7 +50,7 @@ services:
     image: mysql:8.4
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - mysql -hmysql -uroot -proot < /migrations/02-media.sql && mysql -hmysql -uroot -proot < /migrations/03-community-data.sql && mysql -hmysql -uroot -proot < /migrations/04-product-board.sql && mysql -hmysql -uroot -proot < /migrations/05-initial-comment-time.sql && mysql -hmysql -uroot -proot < /migrations/06-community-like-consistency.sql && mysql -hmysql -uroot -proot < /migrations/07-auth.sql
+      - mysql -hmysql -uroot -proot < /migrations/02-media.sql && mysql -hmysql -uroot -proot < /migrations/03-community-data.sql && mysql -hmysql -uroot -proot < /migrations/04-product-board.sql && mysql -hmysql -uroot -proot < /migrations/05-initial-comment-time.sql && mysql -hmysql -uroot -proot < /migrations/06-community-like-consistency.sql && mysql -hmysql -uroot -proot < /migrations/07-auth.sql && mysql -hmysql -uroot -proot < /migrations/08-article-writer.sql
     volumes:
       - ./infra/mysql/migrations:/migrations:ro
     depends_on:
@@ -170,6 +170,7 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/article
       DB_USERNAME: root
       DB_PASSWORD: root
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-modu-square-local-jwt-secret-change-me-2026}
     ports: ["9000:9000"]
     depends_on: *service-dependencies
     restart: unless-stopped

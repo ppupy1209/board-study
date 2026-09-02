@@ -1,11 +1,14 @@
 package board.article.controller;
 
+import board.article.entity.WriterType;
 import board.article.service.ArticleService;
 import board.article.service.request.ArticleCreateRequest;
 import board.article.service.request.ArticleUpdateRequest;
 import board.article.service.response.ArticlePageResponse;
 import board.article.service.response.ArticleResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,8 +42,19 @@ public class ArticleController {
     }
 
     @PostMapping("/v1/articles")
-    public ArticleResponse create(@RequestBody ArticleCreateRequest request) {
-        return articleService.create(request);
+    public ArticleResponse create(
+            @RequestBody ArticleCreateRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        if (jwt == null) {
+            return articleService.create(request, request.getWriterId(), WriterType.GUEST, null);
+        }
+        return articleService.create(
+                request,
+                Long.valueOf(jwt.getSubject()),
+                WriterType.MEMBER,
+                jwt.getClaimAsString("displayName")
+        );
     }
 
     @PutMapping("/v1/articles/{articleId}")

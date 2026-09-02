@@ -14,6 +14,7 @@ import {
   UploadTicket,
   requestJson,
 } from "../../lib/community-api";
+import { getAuthAccessToken } from "../../lib/auth-api";
 
 type AttachmentStatus = "ready" | "uploading" | "processing" | "failed";
 
@@ -142,6 +143,7 @@ export function WriteArticlePage() {
 
     try {
       const guestUserId = getOrCreateGuestIdentity().userId;
+      const accessToken = await getAuthAccessToken();
       for (const attachment of attachmentRef.current) {
         const media = await uploadImage(attachment);
         uploadedMediaIds.push(media.mediaId);
@@ -149,7 +151,10 @@ export function WriteArticlePage() {
 
       createdArticle = await requestJson<Article>(`${ARTICLE_API}/v1/articles`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
           title: normalizedTitle,
           content: normalizedContent,

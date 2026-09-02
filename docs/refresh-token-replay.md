@@ -83,7 +83,7 @@ docker compose run --rm --no-deps k6 run /scripts/auth-refresh-replay.js
 
 ## Guest와 OAuth의 경계
 
-이번 변경은 기존 게시글·댓글·좋아요 API에 인증을 강제하지 않는다. 따라서 Docker Compose로 실행한 뒤 가입 없이 둘러보는 Guest 흐름은 그대로 유지된다. 향후에는 조회는 Guest로 두고 쓰기 요청만 인증하도록 단계적으로 연결할 수 있다.
+조회와 Guest 글쓰기에는 인증을 강제하지 않아 Docker Compose 첫 실행 흐름은 그대로 유지했다. 다만 로그인 사용자가 새 글을 쓰면 Article Service가 요청 본문의 작성자 ID를 신뢰하지 않고 Access Token의 회원 ID와 닉네임을 저장한다. 인증 도입 전에 만든 글과 Guest 글에는 회원 메타데이터가 없으므로 화면에서 기존 `modu_{writerId}` 형식으로 표시한다. 1,500만 건이 든 게시글 테이블을 변경하는 대신 새 로그인 글에만 행이 생기는 `article_writer` 테이블을 분리해 기존 데이터의 갱신과 테이블 재작성을 피했다.
 
 OAuth2/OIDC를 추가할 때도 공급자 callback 이후의 세션 발급을 동일한 Token Family 로직으로 합칠 수 있다. 공급자 연동 테스트는 가짜 OIDC 서버로 `authorization code → callback → 내부 회원 매핑 → 세션 발급`을 자동 검증하고, Google·Kakao 같은 실제 공급자는 환경변수로 주입한 개발용 Client ID/Secret과 redirect URI로 별도 확인할 계획이다. 공급자 비밀값이 없어도 핵심 Token 회전·재사용 방어 테스트는 독립적으로 실행된다.
 

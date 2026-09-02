@@ -20,6 +20,8 @@ class EventTest {
                 .content("content")
                 .boardId(1L)
                 .writerId(1L)
+                .writerType("MEMBER")
+                .writerNickname("연우")
                 .createdAt(LocalDateTime.now())
                 .modifiedAt(LocalDateTime.now())
                 .boardArticleCount(23L)
@@ -39,6 +41,8 @@ class EventTest {
         assertThat(result.getPayload()).isInstanceOf(ArticleCreatedEventPayload.class);
 
         ArticleCreatedEventPayload resultPayload = (ArticleCreatedEventPayload) result.getPayload();
+        assertThat(resultPayload.getWriterType()).isEqualTo("MEMBER");
+        assertThat(resultPayload.getWriterNickname()).isEqualTo("연우");
         System.out.println("resultPayload = " + resultPayload);
     }
 }
