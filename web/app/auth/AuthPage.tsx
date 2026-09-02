@@ -69,8 +69,8 @@ export function AuthPage() {
           <h1 id="auth-title">{mode === "login" ? "다시 만나 반가워요." : "새로운 이야기를 시작해요."}</h1>
           <p className="auth-copy">
             {mode === "login"
-              ? "가입한 이메일로 로그인하면 세션 발급과 로그아웃 흐름을 직접 확인할 수 있어요."
-              : "표시 이름과 이메일을 등록한 뒤 로그인해 보세요."}
+              ? "가입한 이메일과 비밀번호를 입력해 주세요."
+              : "사용할 닉네임과 이메일을 입력해 주세요."}
           </p>
 
           <div className="auth-tabs" role="tablist" aria-label="인증 방식">
@@ -81,7 +81,7 @@ export function AuthPage() {
           <form className="auth-form" onSubmit={submit}>
             {mode === "register" && (
               <label>
-                <span>표시 이름</span>
+                <span>닉네임</span>
                 <input
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
