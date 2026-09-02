@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getOrCreateGuestIdentity, NOTIFICATION_API, Notification as NotificationItem } from "../lib/community-api";
+import { AuthMember, logoutMember, restoreAuthMember } from "../lib/auth-api";
 
 type HeaderProps = {
   query?: string;
@@ -25,6 +26,10 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [guestUserId, setGuestUserId] = useState("");
+  const [authMember, setAuthMember] = useState<AuthMember | null>(null);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [accountError, setAccountError] = useState("");
   const searchValue = query ?? localQuery;
 
   useEffect(() => {
@@ -54,6 +59,14 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    restoreAuthMember().then((member) => {
+      if (active) setAuthMember(member);
+    });
+    return () => { active = false; };
+  }, []);
+
   const totalEventCount = notifications.reduce((sum, notification) => sum + notification.eventCount, 0);
   const notificationBadge = totalEventCount > 99 ? "99+" : String(totalEventCount);
 
@@ -65,6 +78,21 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
     event.preventDefault();
     const normalized = searchValue.trim();
     router.push(normalized ? `/?q=${encodeURIComponent(normalized)}` : "/");
+  }
+
+  async function logout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    setAccountError("");
+    try {
+      await logoutMember();
+      setAuthMember(null);
+      setIsAccountOpen(false);
+    } catch {
+      setAccountError("로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setIsLoggingOut(false);
+    }
   }
 
   return (
@@ -95,7 +123,10 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
           type="button"
           aria-expanded={isNotificationOpen}
           aria-label={`\uCD5C\uADFC \uC54C\uB9BC ${totalEventCount}\uAC74`}
-          onClick={() => setIsNotificationOpen((open) => !open)}
+          onClick={() => {
+            setIsNotificationOpen((open) => !open);
+            setIsAccountOpen(false);
+          }}
         >
           <span aria-hidden="true">{"\uC54C\uB9BC"}</span>
           {totalEventCount > 0 && <b>{notificationBadge}</b>}
@@ -123,7 +154,48 @@ export function CommunityHeader({ query, onQueryChange, onSearchSubmit, active }
           </section>
         )}
       </div>
-      <Link className="profile-button guest-profile" href={guestUserId ? `/?q=modu_${guestUserId}` : "/"} aria-label="내가 쓴 글">Guest</Link>
+      <div className="account-menu">
+        <button
+          className={`profile-button ${authMember ? "member-profile" : "guest-profile"}`}
+          type="button"
+          aria-expanded={isAccountOpen}
+          aria-label={authMember ? `${authMember.displayName} 계정 메뉴` : "Guest 계정 메뉴"}
+          onClick={() => {
+            setIsAccountOpen((open) => !open);
+            setIsNotificationOpen(false);
+            setAccountError("");
+          }}
+        >
+          {authMember?.displayName ?? "Guest"}
+        </button>
+        {isAccountOpen && (
+          <section className="account-panel" aria-label={authMember ? "회원 계정" : "Guest 계정"}>
+            {authMember ? (
+              <>
+                <div className="account-summary">
+                  <strong>{authMember.displayName}</strong>
+                  <span>{authMember.email}</span>
+                </div>
+                {accountError && <p className="account-error" role="alert">{accountError}</p>}
+                <button className="account-logout" type="button" onClick={logout} disabled={isLoggingOut}>
+                  {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="account-summary">
+                  <strong>Guest</strong>
+                  <span>가입 없이 둘러보고 있어요.</span>
+                </div>
+                <Link className="account-primary" href="/auth" onClick={() => setIsAccountOpen(false)}>로그인 · 회원가입</Link>
+                {guestUserId && (
+                  <Link className="account-secondary" href={`/?q=modu_${guestUserId}`} onClick={() => setIsAccountOpen(false)}>Guest로 쓴 글</Link>
+                )}
+              </>
+            )}
+          </section>
+        )}
+      </div>
     </header>
   );
 }

@@ -77,6 +77,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .notification-panel li strong { overflow: hidden; font-size: 12px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .notification-panel li span { color: var(--blue); font-size: 10px; font-weight: 680; }
 .notification-empty { margin: 0; padding: 32px 18px; color: var(--muted); font-size: 11px; text-align: center; }
+.account-menu { position: relative; }
+.profile-button.member-profile { width: auto; max-width: 132px; padding: 0 13px; overflow: hidden; border-radius: 999px; text-overflow: ellipsis; white-space: nowrap; }
+.profile-button[aria-expanded="true"] { border-color: #9eb2fa; background: var(--blue-soft); }
+.account-panel { position: absolute; top: calc(100% + 12px); right: 0; z-index: 50; display: grid; gap: 10px; width: min(280px, calc(100vw - 32px)); padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: white; box-shadow: 0 22px 55px rgba(28,45,76,.18); }
+.account-summary { display: grid; gap: 5px; padding: 2px 2px 9px; border-bottom: 1px solid var(--line); }
+.account-summary strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.account-summary span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.account-primary, .account-secondary, .account-logout { display: grid; place-items: center; min-height: 38px; padding: 0 13px; border-radius: 8px; font-size: 12px; font-weight: 720; cursor: pointer; }
+.account-primary { border: 1px solid var(--ink); background: var(--ink); color: white; }
+.account-secondary { border: 1px solid var(--line); background: white; color: var(--muted); }
+.account-logout { width: 100%; border: 1px solid #f0c9cb; background: #fff7f7; color: #a64249; }
+.account-logout:disabled { cursor: wait; opacity: .62; }
+.account-error { margin: 0; color: #a64249; font-size: 11px; line-height: 1.5; }
 
 main { max-width: 1240px; margin: 0 auto; padding: 52px 24px 72px; }
 .signal-hero {
@@ -273,6 +286,28 @@ footer a:hover { color: var(--blue); }
 .empty-comments span { color: var(--muted); font-size: 11px; }
 .sr-only { position: absolute !important; overflow: hidden; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; clip: rect(0,0,0,0); white-space: nowrap; }
 
+.auth-page { display: grid; place-items: center; min-height: calc(100vh - 148px); max-width: none; padding: 64px 24px 80px; background: radial-gradient(circle at 18% 12%, rgba(97,125,246,.09), transparent 34%), radial-gradient(circle at 86% 82%, rgba(255,176,128,.11), transparent 31%); }
+.auth-card { width: min(460px, 100%); padding: 38px; border: 1px solid rgba(198,207,222,.9); border-radius: 18px; background: rgba(255,255,255,.94); box-shadow: 0 24px 70px rgba(37,53,82,.11); }
+.auth-kicker { margin: 0 0 10px; color: var(--blue); font: 760 10px ui-monospace, "SFMono-Regular", Menlo, monospace; letter-spacing: .14em; }
+.auth-card h1 { margin: 0; font-size: clamp(28px, 4vw, 36px); line-height: 1.2; letter-spacing: -.045em; }
+.auth-copy { min-height: 44px; margin: 13px 0 26px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.auth-tabs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); }
+.auth-tabs button { height: 38px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 720; cursor: pointer; }
+.auth-tabs button[aria-selected="true"] { background: white; color: var(--ink); box-shadow: 0 3px 11px rgba(37,53,82,.09); }
+.auth-form { display: grid; gap: 16px; margin-top: 22px; }
+.auth-form label { display: grid; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 700; }
+.auth-form input { width: 100%; height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font-size: 13px; outline: none; }
+.auth-form input:focus { border-color: #9db0f7; box-shadow: 0 0 0 3px var(--blue-soft); }
+.auth-form label small { color: #aa4249; font-size: 10px; font-weight: 620; }
+.auth-message { margin: -2px 0 0; padding: 11px 12px; border-radius: 8px; font-size: 11px; line-height: 1.55; }
+.auth-message.error { background: #fff2f2; color: #9d343c; }
+.auth-message.success { background: #eef8f2; color: #27734b; }
+.auth-submit { height: 44px; border: 0; border-radius: 9px; background: var(--ink); color: white; font-size: 13px; font-weight: 760; cursor: pointer; }
+.auth-submit:hover { box-shadow: 0 8px 20px rgba(11,19,32,.18); }
+.auth-submit:disabled { cursor: wait; opacity: .65; }
+.auth-guest-link { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 22px; color: var(--muted); font-size: 11px; font-weight: 650; }
+.auth-guest-link span { color: var(--blue); }
+
 @media (min-width: 1061px) and (max-width: 1260px) {
   .signal-hero { gap: 24px; padding-inline: 36px; }
   .signal-hero h1 { font-size: clamp(42px, 4vw, 50px); white-space: nowrap; }
@@ -295,6 +330,9 @@ footer a:hover { color: var(--blue); }
   .main-nav a { font-size: 12px; }
   .search { grid-column: 1 / -1; grid-row: 3; margin-bottom: 12px; }
   .write-button { height: 36px; padding: 0 12px; font-size: 11px; }
+  .profile-button.member-profile { max-width: 88px; }
+  .auth-page { min-height: calc(100vh - 138px); padding: 34px 14px 54px; }
+  .auth-card { padding: 28px 20px; }
   main { padding: 36px 14px 54px; }
   .signal-hero { padding: 30px 24px; min-height: auto; }
   .signal-hero h1 { font-size: 40px; }

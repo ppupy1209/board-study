@@ -39,6 +39,7 @@ public class AccessTokenIssuer {
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(expiresAt))
                 .claim("email", member.getEmail())
+                .claim("displayName", member.getDisplayName())
                 .claim("sid", familyId)
                 .claim("scope", "member")
                 .build();

@@ -100,7 +100,8 @@ class AuthReplayIntegrationTest {
         mockMvc.perform(get("/v1/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("replay@modusquare.test"));
+                .andExpect(jsonPath("$.email").value("replay@modusquare.test"))
+                .andExpect(jsonPath("$.displayName").value("modu-user"));
 
         MvcResult rotated = mockMvc.perform(post("/v1/auth/refresh")
                         .cookie(refreshCookie(originalRefreshToken)))

@@ -29,12 +29,13 @@ test("server-renders the Modu Square community page", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
 
-test("server-renders writing, article detail, community, and popular routes", async () => {
-  const [writeResponse, detailResponse, communityResponse, popularResponse] = await Promise.all([
+test("server-renders writing, article detail, community, popular, and auth routes", async () => {
+  const [writeResponse, detailResponse, communityResponse, popularResponse, authResponse] = await Promise.all([
     render("/write"),
     render("/articles/8000000000000000099"),
     render("/community"),
     render("/popular"),
+    render("/auth"),
   ]);
 
   assert.equal(writeResponse.status, 200);
@@ -46,6 +47,9 @@ test("server-renders writing, article detail, community, and popular routes", as
   assert.match(communityHtml, /<title>커뮤니티 — Modu Square<\/title>/);
   assert.equal(popularResponse.status, 200);
   assert.match(await popularResponse.text(), /<title>인기글 — Modu Square<\/title>/);
+  assert.equal(authResponse.status, 200);
+  const authHtml = await authResponse.text();
+  assert.match(authHtml, /<title>로그인 · 회원가입 — Modu Square<\/title>/);
 });
 
 test("paginates each topic from its own filtered articles", async () => {
@@ -81,13 +85,15 @@ test("paginates each topic from its own filtered articles", async () => {
   assert.equal(invalidTravelPage.items.length, 3);
 });
 
-test("keeps accessibility, navigation, and social preview contracts", async () => {
-  const [page, community, chrome, detail, write, layout, css, packageJson, smallSeed, communityData, likeConsistency, largeSeed] = await Promise.all([
+test("keeps accessibility, navigation, authentication, and social preview contracts", async () => {
+  const [page, community, chrome, detail, write, authPage, authApi, layout, css, packageJson, smallSeed, communityData, likeConsistency, largeSeed] = await Promise.all([
     readFile(new URL("../app/ModuSquareApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/community/CommunityArticlesPage.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/CommunityChrome.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/articles/[articleId]/ArticleDetailPage.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/write/WriteArticlePage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/auth/AuthPage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/auth-api.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -103,7 +109,17 @@ test("keeps accessibility, navigation, and social preview contracts", async () =
   assert.match(chrome, /className="main-nav"[\s\S]*href="\/popular">인기글[\s\S]*href="\/community">커뮤니티/);
   assert.match(chrome, /getOrCreateGuestIdentity/);
   assert.match(chrome, />Guest</);
+  assert.match(chrome, /restoreAuthMember/);
+  assert.match(chrome, /logoutMember/);
+  assert.match(chrome, /로그인 · 회원가입/);
   assert.doesNotMatch(chrome, /YW|\/#community/);
+  assert.match(authPage, /registerMember/);
+  assert.match(authPage, /loginMember/);
+  assert.match(authPage, /minLength=\{mode === "register" \? 10 : undefined\}/);
+  assert.match(authApi, /credentials: "include"/);
+  assert.match(authApi, /window\.sessionStorage/);
+  assert.match(authApi, /SESSION_HINT_STORAGE_KEY/);
+  assert.match(authApi, /\/v1\/auth\/refresh/);
   assert.match(page, /href=\{`\/articles\/\$\{article\.articleId\}`\}/);
   assert.match(page, /popularArticles\.map/);
   assert.match(page, /fetchAllArticles/);

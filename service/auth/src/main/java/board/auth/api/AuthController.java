@@ -57,6 +57,7 @@ public class AuthController {
         return new AuthenticatedMemberResponse(
                 Long.valueOf(jwt.getSubject()),
                 jwt.getClaimAsString("email"),
+                jwt.getClaimAsString("displayName"),
                 jwt.getClaimAsString("sid")
         );
     }
